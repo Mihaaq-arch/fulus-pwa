@@ -58,8 +58,10 @@ export async function syncQueue(onProgress) {
       await db.put(STORE_NAME, { ...item, status: 'synced', gasId, syncedAt: new Date().toISOString() });
       synced++;
     } catch (err) {
-      await db.put(STORE_NAME, { ...item, status: 'error', error: err.message });
-      failed++;
+      // Kalau network error (offline), tetap pending bukan error
+      const isNetworkError = err instanceof TypeError && err.message.includes('fetch');
+      await db.put(STORE_NAME, { ...item, status: isNetworkError ? 'pending' : 'error', error: err.message });
+      if (!isNetworkError) failed++;
     }
     onProgress && onProgress({ synced, failed, total: pending.length });
   }

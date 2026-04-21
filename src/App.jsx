@@ -286,11 +286,13 @@ export default function App() {
     await refreshPending();
     setSubmitted(true);
 
-    // Background sync
-    try {
-      await syncQueue();
-      await refreshPending();
-    } catch (_) {}
+    // Background sync — hanya kalau online, gagal = tetap pending
+    if (navigator.onLine) {
+      try {
+        await syncQueue();
+        await refreshPending();
+      } catch (_) {}
+    }
   };
 
   // Sync manual
