@@ -205,7 +205,8 @@ export default function App() {
 
   const ownerOfFrom  = accounts.find(a => a.name === fromAcc)?.owner || '';
   const ownerOfTo    = accounts.find(a => a.name === toAcc)?.owner || '';
-  const otherOwners  = [...new Set(accounts.map(a => a.owner))].filter(o => o !== 'Unown' && o !== ownerOfFrom);
+  // Akun yang bisa dipilih sebagai "yang benar-benar bayar" = semua akun kecuali fromAcc sendiri dan Unown
+  const otherAccounts = accounts.filter(a => a.owner !== 'Unown' && a.name !== fromAcc);
 
   // Bridge account mapping
   const bridgeMap = {
@@ -266,14 +267,19 @@ export default function App() {
     const txs = [];
 
     if (crossOwner && crossTarget && type === 'Expense') {
-      // Generate 2 transaksi: pengeluaran dari personal + adjustment ke bridge
-      const bridge = bridgeMap[`${ownerOfFrom}-${crossTarget}`] || 'A-S Balance';
+      // crossTarget = nama akun yang benar-benar bayar
+      const ownerOfCross = accounts.find(a => a.name === crossTarget)?.owner || '';
+      const bridgeKey1 = `${ownerOfFrom}-${ownerOfCross}`;
+      const bridgeKey2 = `${ownerOfCross}-${ownerOfFrom}`;
+      const bridge = bridgeMap[bridgeKey1] || bridgeMap[bridgeKey2] || 'A-S Balance';
+      // tx1: pengeluaran dari akun utama (owner fromAcc)
       txs.push({ ...txBase, from: fromAcc, to: '' });
+      // tx2: follow-up dari akun yang bayarin ke bridge
       txs.push({
         type: 'Follow-Up', category: 'Adjust',
         amount: parseInt(amount) || 0,
-        rep: 'One Time', notes: `cross-owner: ${ownerOfFrom}→${crossTarget}`,
-        from: fromAcc, to: bridge,
+        rep: 'One Time', notes: `cross-owner: ${ownerOfFrom}→${ownerOfCross}`,
+        from: crossTarget, to: bridge,
         date: new Date().toISOString(),
       });
     } else if (type === 'Income') {
@@ -427,26 +433,27 @@ export default function App() {
             {/* STEP: category */}
             {currentStepName === 'category' && (
               <Section title="Kategori">
-                {/* Cross-owner toggle (hanya untuk Expense dari Personal) */}
-                {type === 'Expense' && ownerOfFrom === 'Personal' && (
+                {/* Cross-owner toggle — muncul untuk semua Expense */}
+                {type === 'Expense' && (
                   <div style={{ marginBottom:12 }}>
-                    <button onClick={() => setCrossOwner(v => !v)} style={{
+                    <button onClick={() => { setCrossOwner(v => !v); setCrossTarget(''); }} style={{
                       background: crossOwner ? '#00d4aa22' : '#222536',
                       border: `1.5px solid ${crossOwner ? '#00d4aa' : '#2a2d40'}`,
                       color: crossOwner ? '#00d4aa' : '#6b7280',
                       borderRadius:8, padding:'8px 14px',
                       fontSize:12, fontWeight:600, cursor:'pointer', width:'100%'
                     }}>
-                      {crossOwner ? '✓' : '○'} Bayar untuk owner lain (generate 2 baris)
+                      {crossOwner ? '✓' : '○'} Dibayar akun lain (generate 2 baris)
                     </button>
                     {crossOwner && (
                       <div style={{ marginTop:8 }}>
                         <ChipGrid
-                          items={otherOwners}
+                          items={otherAccounts}
                           selected={crossTarget}
                           onSelect={setCrossTarget}
-                          getColor={o => OWNER_COLORS[o] || '#6b7280'}
-                          columns={3}
+                          getLabel={a => a.name}
+                          getColor={a => OWNER_COLORS[a.owner] || '#6b7280'}
+                          columns={2}
                         />
                       </div>
                     )}
