@@ -1,19 +1,9 @@
-// ============================================================
-// FULUS — GAS CONFIG
-// Isi GAS_URL dan GAS_KEY sebelum build/deploy
-// ============================================================
-
-// Config di-load dari config.local.js (tidak di-commit ke repo)
-// Salin config.example.js → config.local.js lalu isi nilainya
 import { GAS_URL, GAS_KEY } from '../config.local.js';
 export { GAS_URL, GAS_KEY };
 
-const headers = { "Content-Type": "application/json" };
-
-// Fetch config (accounts + categories) — cached 24 jam di localStorage
 export async function fetchConfig(forceRefresh = false) {
   const CACHE_KEY = "fulus_config";
-  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 jam
+  const CACHE_TTL = 24 * 60 * 60 * 1000;
 
   if (!forceRefresh) {
     try {
@@ -33,14 +23,15 @@ export async function fetchConfig(forceRefresh = false) {
   return json.data;
 }
 
-// Kirim satu transaksi ke GAS
+// Kirim transaksi — pakai no-cors karena GAS redirect
+// Data tetap masuk ke Sheets, kita skip baca response
 export async function postTransaction(tx) {
-  const res  = await fetch(GAS_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ ...tx, key: GAS_KEY }),
-  });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || "GAS error");
-  return json.id;
+  const payload = encodeURIComponent(JSON.stringify(tx));
+  await fetch(
+    `${GAS_URL}?action=insert&key=${GAS_KEY}&data=${payload}`,
+    { method: 'GET', mode: 'no-cors' }
+  );
+  // no-cors = response opaque, tidak bisa dibaca
+  // tapi request tetap terkirim dan GAS tetap proses
+  return 'sent';
 }

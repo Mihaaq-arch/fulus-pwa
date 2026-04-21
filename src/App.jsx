@@ -217,13 +217,12 @@ export default function App() {
     'ElFamilia-Personal': 'A-E Balance',
   };
 
-  // Steps
+  // Steps — crossOwner tidak punya step sendiri, handled inline di category
   const STEPS = (() => {
     const s = ['type', 'account'];
     if (type === 'Transfer') s.push('toAccount');
     s.push('category');
     if (isDOR) s.push('dor');
-    if (type === 'Expense' && ownerOfFrom === 'Personal' && crossOwner) s.push('crossOwner');
     s.push('amount', 'rep', 'notes');
     return s;
   })();
@@ -451,14 +450,19 @@ export default function App() {
                     )}
                   </div>
                 )}
-                <ChipGrid
-                  items={filteredCats}
-                  selected={category}
-                  onSelect={selectCat}
-                  getLabel={c => c.name}
-                  getColor={() => '#00d4aa'}
-                  columns={2}
-                />
+                <div style={{ opacity: crossOwner && !crossTarget ? 0.3 : 1, pointerEvents: crossOwner && !crossTarget ? 'none' : 'auto' }}>
+                  {crossOwner && !crossTarget && (
+                    <div style={{ fontSize:11, color:'#fbbf24', marginBottom:8 }}>Pilih owner tujuan dulu</div>
+                  )}
+                  <ChipGrid
+                    items={filteredCats}
+                    selected={category}
+                    onSelect={selectCat}
+                    getLabel={c => c.name}
+                    getColor={() => '#00d4aa'}
+                    columns={2}
+                  />
+                </div>
               </Section>
             )}
 

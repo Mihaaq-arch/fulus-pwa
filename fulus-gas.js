@@ -181,7 +181,6 @@ function doGet(e) {
       result = { ok: true, data: getRecentTransactions(limit) };
 
     } else if (action === "config") {
-      // Ambil semua yang dibutuhkan PWA sekaligus — satu request saat startup
       result = {
         ok: true,
         data: {
@@ -190,6 +189,14 @@ function doGet(e) {
           repOptions: ["One Time", "Monthly", "Quarterly", "Yearly", "Weekly"],
         }
       };
+
+    } else if (action === "insert") {
+      // Terima transaksi via GET (CORS workaround)
+      const dataRaw = e && e.parameter && e.parameter.data ? e.parameter.data : null;
+      if (!dataRaw) throw new Error("data wajib diisi");
+      const tx = JSON.parse(dataRaw);
+      const id = insertTransaction(tx);
+      result = { ok: true, id };
 
     } else {
       result = { ok: true, message: "Fulus GAS v3 is alive" };
