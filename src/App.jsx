@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchConfig, fetchSummary, fetchBalances } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 
+// ── VERSION ───────────────────────────────────────────────────
+const APP_VERSION = "0.4.0";
+
 // ── THEME ─────────────────────────────────────────────────────
 const DARK = {
   bg:       '#13141f',
@@ -620,6 +623,7 @@ export default function App() {
       <div style={s.header}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span style={{ fontSize:18, fontWeight:800, color: t.text, letterSpacing:-0.5 }}>Fulus</span>
+          <span style={{ fontSize:9, color: t.subtext, fontFamily:'DM Mono, monospace', marginLeft:2, marginTop:4 }}>v{APP_VERSION}</span>
           {pendingCount > 0 && (
             <span style={{ fontSize:10, background:'#fbbf2420', color:'#fbbf24', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
               {pendingCount} pending
