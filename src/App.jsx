@@ -2,9 +2,30 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchConfig } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 
-// ── CONSTANTS ────────────────────────────────────────────────
+// ── THEME ─────────────────────────────────────────────────────
+const DARK = {
+  bg:       '#13141f',
+  surface:  '#1c1e2e',
+  card:     '#222438',
+  border:   '#2e3048',
+  text:     '#e2e4f0',
+  subtext:  '#7b7f9e',
+  muted:    '#3a3d58',
+  accent:   '#00cfa8',
+};
+const LIGHT = {
+  bg:       '#f4f5fb',
+  surface:  '#ffffff',
+  card:     '#f0f1fa',
+  border:   '#dde0f0',
+  text:     '#1a1c2e',
+  subtext:  '#6b6f8e',
+  muted:    '#c8cce0',
+  accent:   '#00a88a',
+};
+
 const OWNER_COLORS = {
-  Personal:  '#00d4aa',
+  Personal:  '#00cfa8',
   Servo:     '#60a5fa',
   House:     '#c084fc',
   ElFamilia: '#f87171',
@@ -20,42 +41,38 @@ const TYPE_CONFIG = {
 
 const REP_OPTIONS = ['One Time', 'Monthly', 'Quarterly', 'Yearly', 'Weekly'];
 
-// ── NUMPAD ───────────────────────────────────────────────────
-function NumPad({ value, onChange }) {
+// ── NUMPAD ────────────────────────────────────────────────────
+function NumPad({ value, onChange, t }) {
   const handle = (key) => {
-    if (key === '⌫') {
-      onChange(value.slice(0, -1) || '0');
-    } else if (key === '000') {
-      onChange(value === '0' ? '0' : value + '000');
-    } else {
-      onChange(value === '0' ? key : value + key);
-    }
+    if (key === '⌫') onChange(value.slice(0, -1) || '0');
+    else if (key === '000') onChange(value === '0' ? '0' : value + '000');
+    else onChange(value === '0' ? key : value + key);
   };
-
   const formatted = parseInt(value || '0').toLocaleString('id-ID');
   const keys = ['1','2','3','4','5','6','7','8','9','000','0','⌫'];
-
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       <div style={{
-        background:'#222536', borderRadius:12, padding:'16px 20px',
+        background: t.card, borderRadius:14, padding:'16px 20px',
         textAlign:'right', fontFamily:'DM Mono, monospace',
         fontSize: value.length > 8 ? 28 : 36, fontWeight:700,
-        color:'#e8eaf0', letterSpacing:1, minHeight:60,
-        display:'flex', alignItems:'center', justifyContent:'flex-end'
+        color: t.text, letterSpacing:1, minHeight:64,
+        display:'flex', alignItems:'center', justifyContent:'flex-end',
+        border: `1.5px solid ${t.border}`
       }}>
-        <span style={{ color:'#6b7280', fontSize:18, marginRight:4 }}>Rp</span>
+        <span style={{ color: t.subtext, fontSize:18, marginRight:4 }}>Rp</span>
         {formatted}
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8 }}>
         {keys.map(k => (
           <button key={k} onClick={() => handle(k)} style={{
-            background: k === '⌫' ? '#2d1f1f' : '#222536',
-            color: k === '⌫' ? '#f87171' : '#e8eaf0',
-            border:'none', borderRadius:10, padding:'18px 0',
+            background: k === '⌫' ? '#2d1f1f' : t.card,
+            color: k === '⌫' ? '#f87171' : t.text,
+            border: `1.5px solid ${k === '⌫' ? '#4a2020' : t.border}`,
+            borderRadius:12, padding:'18px 0',
             fontSize: k === '000' ? 16 : 22, fontWeight:600,
             fontFamily:'DM Mono, monospace', cursor:'pointer',
-            transition:'all 0.1s', active:{ background:'#2a2d40' }
+            transition:'all 0.1s'
           }}>{k}</button>
         ))}
       </div>
@@ -63,23 +80,23 @@ function NumPad({ value, onChange }) {
   );
 }
 
-// ── CHIP GRID ────────────────────────────────────────────────
-function ChipGrid({ items, selected, onSelect, getLabel, getColor, columns = 2 }) {
+// ── CHIP GRID ─────────────────────────────────────────────────
+function ChipGrid({ items, selected, onSelect, getLabel, getColor, getKey, columns = 2, t }) {
   return (
     <div style={{ display:'grid', gridTemplateColumns:`repeat(${columns}, 1fr)`, gap:8 }}>
       {items.map((item, i) => {
-        const label = getLabel ? getLabel(item) : item;
-        const color = getColor ? getColor(item) : '#00d4aa';
-        const isSelected = selected === item || selected === label;
+        const label = getLabel ? getLabel(item) : String(item);
+        const color = getColor ? getColor(item) : t?.accent || '#00cfa8';
+        const key   = getKey ? getKey(item) : label;
+        const isSel = selected === item || selected === label || selected === key;
         return (
           <button key={i} onClick={() => onSelect(item)} style={{
-            background: isSelected ? color + '22' : '#222536',
-            border: `1.5px solid ${isSelected ? color : '#2a2d40'}`,
-            color: isSelected ? color : '#9ca3af',
+            background: isSel ? color + '20' : t?.card || '#222438',
+            border: `1.5px solid ${isSel ? color : t?.border || '#2e3048'}`,
+            color: isSel ? color : t?.subtext || '#7b7f9e',
             borderRadius:10, padding:'13px 8px',
-            fontSize:13, fontWeight: isSelected ? 700 : 500,
-            cursor:'pointer', transition:'all 0.15s', textAlign:'center',
-            lineHeight:1.3
+            fontSize:13, fontWeight: isSel ? 700 : 500,
+            cursor:'pointer', transition:'all 0.15s', textAlign:'center', lineHeight:1.3
           }}>{label}</button>
         );
       })}
@@ -87,14 +104,14 @@ function ChipGrid({ items, selected, onSelect, getLabel, getColor, columns = 2 }
   );
 }
 
-// ── STEP INDICATOR ───────────────────────────────────────────
-function StepDots({ total, current }) {
+// ── STEP DOTS ─────────────────────────────────────────────────
+function StepDots({ total, current, t }) {
   return (
     <div style={{ display:'flex', gap:6, justifyContent:'center', marginBottom:8 }}>
       {Array.from({ length: total }).map((_, i) => (
         <div key={i} style={{
-          width: i === current ? 20 : 6, height:6,
-          borderRadius:3, background: i === current ? '#00d4aa' : i < current ? '#00d4aa44' : '#2a2d40',
+          width: i === current ? 20 : 6, height:6, borderRadius:3,
+          background: i === current ? t.accent : i < current ? t.accent + '44' : t.muted,
           transition:'all 0.2s'
         }} />
       ))}
@@ -102,54 +119,85 @@ function StepDots({ total, current }) {
   );
 }
 
-// ── HISTORY ITEM ─────────────────────────────────────────────
-function HistoryItem({ item }) {
+// ── SEPARATOR ─────────────────────────────────────────────────
+function Separator({ label, t }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'16px 0 12px' }}>
+      <div style={{ flex:1, height:1, background: t.border }} />
+      {label && <span style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>{label}</span>}
+      <div style={{ flex:1, height:1, background: t.border }} />
+    </div>
+  );
+}
+
+// ── HISTORY ITEM ──────────────────────────────────────────────
+function HistoryItem({ item, t }) {
   const typeColor = { Expense:'#f87171', Income:'#4ade80', Transfer:'#60a5fa' };
   const color = typeColor[item.type] || '#9ca3af';
   const ownerColor = OWNER_COLORS[item.owner] || '#6b7280';
   const isPending = item.status === 'pending';
   const isError   = item.status === 'error';
-
   return (
     <div style={{
-      background:'#1a1d27', borderRadius:12, padding:'12px 16px',
+      background: t.surface, borderRadius:14, padding:'12px 16px',
       display:'flex', alignItems:'center', gap:12,
-      borderLeft:`3px solid ${color}`,
-      opacity: isPending ? 0.7 : 1
+      borderLeft:`3px solid ${color}`, opacity: isPending ? 0.7 : 1,
+      border: `1px solid ${t.border}`, borderLeftWidth:3, borderLeftColor: color,
     }}>
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
-          <span style={{ fontSize:12, color:ownerColor, fontWeight:700 }}>{item.owner}</span>
-          <span style={{ fontSize:11, color:'#4b5563' }}>·</span>
-          <span style={{ fontSize:12, color:'#6b7280' }}>{item.category}</span>
-          {isPending && <span style={{ fontSize:10, color:'#fbbf24', background:'#fbbf2422', padding:'1px 6px', borderRadius:4 }}>pending</span>}
-          {isError   && <span style={{ fontSize:10, color:'#f87171', background:'#f8717122', padding:'1px 6px', borderRadius:4 }}>error</span>}
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3, flexWrap:'wrap' }}>
+          <span style={{ fontSize:12, color: ownerColor, fontWeight:700 }}>{item.owner}</span>
+          <span style={{ fontSize:11, color: t.muted }}>·</span>
+          <span style={{ fontSize:12, color: t.subtext }}>{item.category}</span>
+          {isPending && <span style={{ fontSize:10, color:'#fbbf24', background:'#fbbf2420', padding:'1px 6px', borderRadius:4 }}>pending</span>}
+          {isError   && <span style={{ fontSize:10, color:'#f87171', background:'#f8717120', padding:'1px 6px', borderRadius:4 }}>error</span>}
         </div>
-        <div style={{ fontSize:11, color:'#4b5563', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-          {item.from || '—'} {item.to ? `→ ${item.to}` : ''}
-          {item.notes ? ` · ${item.notes}` : ''}
+        <div style={{ fontSize:11, color: t.subtext, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+          {item.from || '—'} {item.to ? `→ ${item.to}` : ''}{item.notes ? ` · ${item.notes}` : ''}
         </div>
       </div>
       <div style={{ textAlign:'right', flexShrink:0 }}>
         <div style={{ fontSize:15, fontWeight:700, color, fontFamily:'DM Mono, monospace' }}>
-          {item.type === 'Expense' ? '-' : item.type === 'Income' ? '+' : ''}
-          Rp{parseInt(item.amount || 0).toLocaleString('id-ID')}
+          {item.type === 'Expense' ? '-' : item.type === 'Income' ? '+' : ''}Rp{parseInt(item.amount || 0).toLocaleString('id-ID')}
         </div>
-        <div style={{ fontSize:10, color:'#4b5563' }}>
-          {item.rep !== 'One Time' ? item.rep : ''}
-        </div>
+        <div style={{ fontSize:10, color: t.subtext }}>{item.rep !== 'One Time' ? item.rep : ''}</div>
       </div>
     </div>
   );
 }
 
-// ── MAIN APP ─────────────────────────────────────────────────
+// ── SECTION ───────────────────────────────────────────────────
+function Section({ title, children, t }) {
+  return (
+    <div>
+      <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1.2, marginBottom:10 }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab]           = useState('input'); // input | history
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('fulus_theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+  const t = isDark ? DARK : LIGHT;
+
+  const toggleTheme = () => {
+    setIsDark(v => {
+      localStorage.setItem('fulus_theme', !v ? 'dark' : 'light');
+      return !v;
+    });
+  };
+
+  const [tab, setTab]           = useState('input');
   const [config, setConfig]     = useState(null);
   const [loading, setLoading]   = useState(true);
   const [configErr, setConfigErr] = useState(null);
-
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]   = useState(false);
   const [syncMsg, setSyncMsg]   = useState('');
@@ -161,6 +209,7 @@ export default function App() {
   const [fromAcc, setFromAcc]   = useState('');
   const [toAcc, setToAcc]       = useState('');
   const [category, setCategory] = useState('');
+  const [catSearch, setCatSearch] = useState('');
   const [crossOwner, setCrossOwner] = useState(false);
   const [crossTarget, setCrossTarget] = useState('');
   const [dorPerson, setDorPerson]   = useState('');
@@ -170,21 +219,18 @@ export default function App() {
   const [notes, setNotes]       = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  // Load config
   useEffect(() => {
     fetchConfig()
       .then(data => { setConfig(data); setLoading(false); })
       .catch(err  => { setConfigErr(err.message); setLoading(false); });
   }, []);
 
-  // Load pending count
   const refreshPending = useCallback(async () => {
     setPendingCount(await getPendingCount());
   }, []);
 
   useEffect(() => { refreshPending(); }, []);
 
-  // Load history
   const refreshHistory = useCallback(async () => {
     const all = await getAll();
     setHistory(all.slice(0, 30));
@@ -194,31 +240,28 @@ export default function App() {
     if (tab === 'history') refreshHistory();
   }, [tab]);
 
-  // Derived
-  const accounts    = config?.accounts || [];
-  const categories  = config?.categories || [];
-  const repOptions  = config?.repOptions || REP_OPTIONS;
+  const accounts   = config?.accounts || [];
+  const categories = config?.categories || [];
+  const repOptions = config?.repOptions || REP_OPTIONS;
 
-  const filteredCats = categories.filter(c => c.type === type);
+  const filteredCats = categories
+    .filter(c => c.type === type)
+    .filter(c => !catSearch || c.name.toLowerCase().includes(catSearch.toLowerCase()));
   const selectedCat  = categories.find(c => c.name === category);
   const isDOR        = selectedCat?.dor === true || selectedCat?.dor === 'true';
 
-  const ownerOfFrom  = accounts.find(a => a.name === fromAcc)?.owner || '';
-  const ownerOfTo    = accounts.find(a => a.name === toAcc)?.owner || '';
-  // Akun yang bisa dipilih sebagai "yang benar-benar bayar" = semua akun kecuali fromAcc sendiri dan Unown
+  const ownerOfFrom   = accounts.find(a => a.name === fromAcc)?.owner || '';
   const otherAccounts = accounts.filter(a => a.owner !== 'Unown' && a.name !== fromAcc);
 
-  // Bridge account mapping
   const bridgeMap = {
-    'Personal-Servo':   'A-S Balance',
-    'Servo-Personal':   'A-S Balance',
-    'Personal-House':   'A-H Balance',
-    'House-Personal':   'A-H Balance',
+    'Personal-Servo':     'A-S Balance',
+    'Servo-Personal':     'A-S Balance',
+    'Personal-House':     'A-H Balance',
+    'House-Personal':     'A-H Balance',
     'Personal-ElFamilia': 'A-E Balance',
     'ElFamilia-Personal': 'A-E Balance',
   };
 
-  // Steps — crossOwner tidak punya step sendiri, handled inline di category
   const STEPS = (() => {
     const s = ['type', 'account'];
     if (type === 'Transfer') s.push('toAccount');
@@ -231,56 +274,35 @@ export default function App() {
   const currentStepName = STEPS[step];
   const totalSteps      = STEPS.length;
 
-  const goBack = () => {
-    if (step === 0) return;
-    setStep(s => s - 1);
-  };
-
-  const goNext = () => {
-    if (step < STEPS.length - 1) setStep(s => s + 1);
-  };
+  const goBack = () => { if (step > 0) setStep(s => s - 1); };
+  const goNext = () => { if (step < STEPS.length - 1) setStep(s => s + 1); };
 
   const reset = () => {
     setStep(0); setType(''); setFromAcc(''); setToAcc('');
-    setCategory(''); setCrossOwner(false); setCrossTarget('');
+    setCategory(''); setCatSearch(''); setCrossOwner(false); setCrossTarget('');
     setDorPerson(''); setDorContext('');
     setAmount('0'); setRep('One Time'); setNotes('');
     setSubmitted(false);
   };
 
-  // Auto-advance setelah pilih
   const selectType = (t) => { setType(t); setTimeout(goNext, 200); };
   const selectFrom = (a) => { setFromAcc(a); setTimeout(goNext, 200); };
   const selectTo   = (a) => { setToAcc(a); setTimeout(goNext, 200); };
   const selectCat  = (c) => { setCategory(c.name); setTimeout(goNext, 200); };
   const selectRep  = (r) => { setRep(r); setTimeout(goNext, 200); };
 
-  // Submit
   const handleSubmit = async () => {
-    const txBase = {
-      type, category,
-      amount: parseInt(amount) || 0,
-      rep, notes,
-      date: new Date().toISOString(),
-    };
-
+    const txBase = { type, category, amount: parseInt(amount) || 0, rep, notes, date: new Date().toISOString() };
     const txs = [];
 
     if (crossOwner && crossTarget && type === 'Expense') {
-      // crossTarget = nama akun yang benar-benar bayar
       const ownerOfCross = accounts.find(a => a.name === crossTarget)?.owner || '';
-      const bridgeKey1 = `${ownerOfFrom}-${ownerOfCross}`;
-      const bridgeKey2 = `${ownerOfCross}-${ownerOfFrom}`;
-      const bridge = bridgeMap[bridgeKey1] || bridgeMap[bridgeKey2] || 'A-S Balance';
-      // tx1: pengeluaran dari akun utama (owner fromAcc)
+      const bridge = bridgeMap[`${ownerOfFrom}-${ownerOfCross}`] || bridgeMap[`${ownerOfCross}-${ownerOfFrom}`] || 'A-S Balance';
       txs.push({ ...txBase, from: fromAcc, to: '' });
-      // tx2: follow-up dari akun yang bayarin ke bridge
       txs.push({
-        type: 'Follow-Up', category: 'Adjust',
-        amount: parseInt(amount) || 0,
+        type: 'Follow-Up', category: 'Adjust', amount: parseInt(amount) || 0,
         rep: 'One Time', notes: `cross-owner: ${ownerOfFrom}→${ownerOfCross}`,
-        from: crossTarget, to: bridge,
-        date: new Date().toISOString(),
+        from: crossTarget, to: bridge, date: new Date().toISOString(),
       });
     } else if (type === 'Income') {
       txs.push({ ...txBase, from: '', to: toAcc || fromAcc });
@@ -292,103 +314,108 @@ export default function App() {
     await refreshPending();
     setSubmitted(true);
 
-    // Background sync — hanya kalau online, gagal = tetap pending
     if (navigator.onLine) {
-      try {
-        await syncQueue();
-        await refreshPending();
-      } catch (_) {}
+      try { await syncQueue(); await refreshPending(); } catch (_) {}
     }
   };
 
-  // Sync manual
   const handleSync = async () => {
     setSyncing(true); setSyncMsg('');
     try {
-      const result = await syncQueue(({ synced, total }) => {
-        setSyncMsg(`Syncing ${synced}/${total}...`);
-      });
+      const result = await syncQueue(({ synced, total }) => setSyncMsg(`Syncing ${synced}/${total}...`));
       await clearSynced();
       await refreshPending();
       setSyncMsg(`✓ ${result.synced} berhasil${result.failed ? `, ${result.failed} gagal` : ''}`);
     } catch (err) {
-      setSyncMsg('Sync gagal: ' + err.message);
+      setSyncMsg('Gagal: ' + err.message);
     }
     setSyncing(false);
     setTimeout(() => setSyncMsg(''), 3000);
   };
 
-  // ── RENDER ────────────────────────────────────────────────
+  // ── STYLES (theme-aware) ──────────────────────────────────
+  const s = {
+    screen:  { background: t.bg, minHeight:'100dvh', maxWidth:430, margin:'0 auto', display:'flex', flexDirection:'column', fontFamily:"'Sora', sans-serif", color: t.text, transition:'background 0.2s, color 0.2s' },
+    header:  { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 20px 12px', borderBottom:`1px solid ${t.border}`, background: t.surface },
+    tabs:    { display:'flex', borderBottom:`1px solid ${t.border}`, background: t.surface },
+    tabBtn:  { flex:1, background:'none', border:'none', padding:'12px', fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.15s', color: t.subtext },
+    content: { flex:1, padding:'20px 16px', overflowY:'auto' },
+    backBtn: { background:'none', border:'none', color: t.subtext, fontSize:12, cursor:'pointer', padding:0 },
+    input:   { width:'100%', background: t.card, border:`1.5px solid ${t.border}`, borderRadius:10, padding:'12px 14px', color: t.text, fontSize:14, outline:'none', boxSizing:'border-box' },
+    primaryBtn: { width:'100%', background: t.card, border:`1.5px solid ${t.accent}`, color: t.accent, borderRadius:12, padding:'15px', fontSize:15, fontWeight:700, cursor:'pointer' },
+    ghostBtn:   { width:'100%', background:'none', border:`1.5px solid ${t.border}`, color: t.subtext, borderRadius:12, padding:'13px', fontSize:13, fontWeight:600, cursor:'pointer' },
+    searchBox: { width:'100%', background: t.card, border:`1.5px solid ${t.border}`, borderRadius:10, padding:'10px 14px', color: t.text, fontSize:13, outline:'none', boxSizing:'border-box', marginBottom:10 },
+  };
+
   if (loading) return (
-    <div style={{ ...styles.screen, justifyContent:'center', alignItems:'center' }}>
-      <div style={{ color:'#00d4aa', fontSize:14 }}>Memuat Fulus...</div>
+    <div style={{ ...s.screen, justifyContent:'center', alignItems:'center' }}>
+      <div style={{ color: t.accent, fontSize:14 }}>Memuat Fulus...</div>
     </div>
   );
 
   if (configErr) return (
-    <div style={{ ...styles.screen, justifyContent:'center', alignItems:'center', padding:32 }}>
+    <div style={{ ...s.screen, justifyContent:'center', alignItems:'center', padding:32 }}>
       <div style={{ color:'#f87171', fontSize:13, textAlign:'center' }}>
-        Gagal load config<br /><span style={{ color:'#6b7280', fontSize:11 }}>{configErr}</span>
+        Gagal load config<br /><span style={{ color: t.subtext, fontSize:11 }}>{configErr}</span>
       </div>
     </div>
   );
 
   return (
-    <div style={styles.screen}>
+    <div style={s.screen}>
       {/* Header */}
-      <div style={styles.header}>
+      <div style={s.header}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ fontSize:18, fontWeight:800, color:'#e8eaf0', letterSpacing:-0.5 }}>Fulus</span>
+          <span style={{ fontSize:18, fontWeight:800, color: t.text, letterSpacing:-0.5 }}>Fulus</span>
           {pendingCount > 0 && (
-            <span style={{ fontSize:10, background:'#fbbf2422', color:'#fbbf24', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
+            <span style={{ fontSize:10, background:'#fbbf2420', color:'#fbbf24', padding:'2px 7px', borderRadius:10, fontWeight:700 }}>
               {pendingCount} pending
             </span>
           )}
         </div>
-        <button onClick={handleSync} disabled={syncing || pendingCount === 0} style={{
-          background:'none', border:'none', color: pendingCount > 0 ? '#00d4aa' : '#4b5563',
-          fontSize:12, cursor: pendingCount > 0 ? 'pointer' : 'default', fontWeight:600,
-          padding:'4px 8px'
-        }}>
-          {syncing ? 'Syncing...' : syncMsg || (pendingCount > 0 ? '↑ Sync' : '✓ Synced')}
-        </button>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <button onClick={toggleTheme} style={{ background:'none', border:'none', cursor:'pointer', fontSize:16, padding:'4px' }}>
+            {isDark ? '☀️' : '🌙'}
+          </button>
+          <button onClick={handleSync} disabled={syncing || pendingCount === 0} style={{
+            background:'none', border:'none', color: pendingCount > 0 ? t.accent : t.subtext,
+            fontSize:12, cursor: pendingCount > 0 ? 'pointer' : 'default', fontWeight:600, padding:'4px 8px'
+          }}>
+            {syncing ? 'Syncing...' : syncMsg || (pendingCount > 0 ? '↑ Sync' : '✓ Synced')}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div style={styles.tabs}>
-        {['input','history'].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            ...styles.tabBtn,
-            color:    tab === t ? '#00d4aa' : '#6b7280',
-            borderBottom: tab === t ? '2px solid #00d4aa' : '2px solid transparent',
-          }}>{t === 'input' ? '💸 Catat' : '📋 Riwayat'}</button>
+      <div style={s.tabs}>
+        {['input','history'].map(tb => (
+          <button key={tb} onClick={() => setTab(tb)} style={{
+            ...s.tabBtn,
+            color: tab === tb ? t.accent : t.subtext,
+            borderBottom: tab === tb ? `2px solid ${t.accent}` : '2px solid transparent',
+          }}>{tb === 'input' ? '💸 Catat' : '📋 Riwayat'}</button>
         ))}
       </div>
 
       {/* Content */}
-      <div style={styles.content}>
+      <div style={s.content}>
 
-        {/* ── INPUT TAB ─────────────────────────────────── */}
+        {/* ── INPUT ─────────────────────────────────────── */}
         {tab === 'input' && !submitted && (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <StepDots total={totalSteps} current={step} />
+            <StepDots total={totalSteps} current={step} t={t} />
+            {step > 0 && <button onClick={goBack} style={s.backBtn}>← Kembali</button>}
 
-            {/* Back button */}
-            {step > 0 && (
-              <button onClick={goBack} style={{ ...styles.backBtn }}>← Kembali</button>
-            )}
-
-            {/* STEP: type */}
+            {/* TYPE */}
             {currentStepName === 'type' && (
-              <Section title="Jenis transaksi">
+              <Section title="Jenis transaksi" t={t}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
                   {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
                     <button key={key} onClick={() => selectType(key)} style={{
-                      background: type === key ? cfg.color + '22' : '#222536',
-                      border: `1.5px solid ${type === key ? cfg.color : '#2a2d40'}`,
-                      color: type === key ? cfg.color : '#9ca3af',
-                      borderRadius:12, padding:'18px 8px',
-                      fontSize:13, fontWeight:700, cursor:'pointer',
+                      background: type === key ? cfg.color + '20' : t.card,
+                      border: `1.5px solid ${type === key ? cfg.color : t.border}`,
+                      color: type === key ? cfg.color : t.subtext,
+                      borderRadius:12, padding:'18px 8px', fontSize:13, fontWeight:700, cursor:'pointer',
                       display:'flex', flexDirection:'column', alignItems:'center', gap:4
                     }}>
                       <span style={{ fontSize:22 }}>{cfg.icon}</span>
@@ -399,9 +426,9 @@ export default function App() {
               </Section>
             )}
 
-            {/* STEP: account (from / to tergantung type) */}
+            {/* ACCOUNT */}
             {currentStepName === 'account' && (
-              <Section title={type === 'Income' ? 'Masuk ke akun' : 'Dari akun'}>
+              <Section title={type === 'Income' ? 'Masuk ke akun' : 'Dari akun'} t={t}>
                 <ChipGrid
                   items={accounts.filter(a => a.owner !== 'Unown')}
                   selected={type === 'Income' ? toAcc : fromAcc}
@@ -410,38 +437,39 @@ export default function App() {
                     : (a) => selectFrom(a.name)
                   }
                   getLabel={a => a.name}
+                  getKey={a => a.name}
                   getColor={a => OWNER_COLORS[a.owner] || '#6b7280'}
-                  columns={2}
+                  columns={2} t={t}
                 />
               </Section>
             )}
 
-            {/* STEP: toAccount (Transfer only) */}
+            {/* TO ACCOUNT */}
             {currentStepName === 'toAccount' && (
-              <Section title="Ke akun">
+              <Section title="Ke akun" t={t}>
                 <ChipGrid
                   items={accounts.filter(a => a.owner !== 'Unown' && a.name !== fromAcc)}
                   selected={toAcc}
                   onSelect={a => selectTo(a.name)}
                   getLabel={a => a.name}
+                  getKey={a => a.name}
                   getColor={a => OWNER_COLORS[a.owner] || '#6b7280'}
-                  columns={2}
+                  columns={2} t={t}
                 />
               </Section>
             )}
 
-            {/* STEP: category */}
+            {/* CATEGORY */}
             {currentStepName === 'category' && (
-              <Section title="Kategori">
-                {/* Cross-owner toggle — muncul untuk semua Expense */}
+              <div>
+                {/* Cross-owner toggle */}
                 {type === 'Expense' && (
                   <div style={{ marginBottom:12 }}>
                     <button onClick={() => { setCrossOwner(v => !v); setCrossTarget(''); }} style={{
-                      background: crossOwner ? '#00d4aa22' : '#222536',
-                      border: `1.5px solid ${crossOwner ? '#00d4aa' : '#2a2d40'}`,
-                      color: crossOwner ? '#00d4aa' : '#6b7280',
-                      borderRadius:8, padding:'8px 14px',
-                      fontSize:12, fontWeight:600, cursor:'pointer', width:'100%'
+                      background: crossOwner ? t.accent + '20' : t.card,
+                      border: `1.5px solid ${crossOwner ? t.accent : t.border}`,
+                      color: crossOwner ? t.accent : t.subtext,
+                      borderRadius:10, padding:'10px 14px', fontSize:12, fontWeight:600, cursor:'pointer', width:'100%'
                     }}>
                       {crossOwner ? '✓' : '○'} Dibayar akun lain (generate 2 baris)
                     </button>
@@ -450,97 +478,82 @@ export default function App() {
                         <ChipGrid
                           items={otherAccounts}
                           selected={crossTarget}
-                          onSelect={setCrossTarget}
+                          onSelect={a => setCrossTarget(a.name)}
                           getLabel={a => a.name}
+                          getKey={a => a.name}
                           getColor={a => OWNER_COLORS[a.owner] || '#6b7280'}
-                          columns={2}
+                          columns={2} t={t}
                         />
                       </div>
                     )}
                   </div>
                 )}
+
+                <Separator label="Kategori" t={t} />
+
+                {/* Search */}
+                <input
+                  value={catSearch}
+                  onChange={e => setCatSearch(e.target.value)}
+                  placeholder="Cari kategori..."
+                  style={s.searchBox}
+                />
+
                 <div style={{ opacity: crossOwner && !crossTarget ? 0.3 : 1, pointerEvents: crossOwner && !crossTarget ? 'none' : 'auto' }}>
                   {crossOwner && !crossTarget && (
-                    <div style={{ fontSize:11, color:'#fbbf24', marginBottom:8 }}>Pilih owner tujuan dulu</div>
+                    <div style={{ fontSize:11, color:'#fbbf24', marginBottom:8 }}>Pilih akun yang bayar dulu</div>
                   )}
-                  <ChipGrid
-                    items={filteredCats}
-                    selected={category}
-                    onSelect={selectCat}
-                    getLabel={c => c.name}
-                    getColor={() => '#00d4aa'}
-                    columns={2}
-                  />
+                  {filteredCats.length === 0
+                    ? <div style={{ color: t.subtext, fontSize:13, textAlign:'center', padding:'20px 0' }}>Tidak ada kategori</div>
+                    : <ChipGrid
+                        items={filteredCats}
+                        selected={category}
+                        onSelect={selectCat}
+                        getLabel={c => c.name}
+                        getColor={() => t.accent}
+                        columns={2} t={t}
+                      />
+                  }
                 </div>
-              </Section>
+              </div>
             )}
 
-            {/* STEP: DOR */}
+            {/* DOR */}
             {currentStepName === 'dor' && (
-              <Section title="Detail hutang/piutang">
-                <label style={styles.label}>Orang</label>
-                <input
-                  value={dorPerson} onChange={e => setDorPerson(e.target.value)}
-                  placeholder="Nama orang..."
-                  style={styles.input}
-                />
-                <label style={{ ...styles.label, marginTop:12 }}>Konteks</label>
-                <ChipGrid
-                  items={['Office', 'Personal']}
-                  selected={dorContext}
-                  onSelect={setDorContext}
-                  getColor={() => '#00d4aa'}
-                  columns={2}
-                />
-                <button onClick={goNext} disabled={!dorPerson || !dorContext} style={{
-                  ...styles.primaryBtn,
-                  marginTop:16,
-                  opacity: (!dorPerson || !dorContext) ? 0.4 : 1
-                }}>Lanjut</button>
+              <Section title="Detail hutang/piutang" t={t}>
+                <label style={{ display:'block', fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>Orang</label>
+                <input value={dorPerson} onChange={e => setDorPerson(e.target.value)} placeholder="Nama orang..." style={s.input} />
+                <label style={{ display:'block', fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, margin:'12px 0 6px' }}>Konteks</label>
+                <ChipGrid items={['Office', 'Personal']} selected={dorContext} onSelect={setDorContext} getColor={() => t.accent} columns={2} t={t} />
+                <button onClick={goNext} disabled={!dorPerson || !dorContext} style={{ ...s.primaryBtn, marginTop:16, opacity: (!dorPerson || !dorContext) ? 0.4 : 1 }}>Lanjut</button>
               </Section>
             )}
 
-            {/* STEP: amount */}
+            {/* AMOUNT */}
             {currentStepName === 'amount' && (
-              <Section title="Nominal">
-                <NumPad value={amount} onChange={setAmount} />
-                <button
-                  onClick={goNext}
-                  disabled={!amount || amount === '0'}
-                  style={{ ...styles.primaryBtn, marginTop:12, opacity: (!amount || amount === '0') ? 0.4 : 1 }}
-                >Lanjut</button>
+              <Section title="Nominal" t={t}>
+                <NumPad value={amount} onChange={setAmount} t={t} />
+                <button onClick={goNext} disabled={!amount || amount === '0'} style={{ ...s.primaryBtn, marginTop:12, opacity: (!amount || amount === '0') ? 0.4 : 1 }}>Lanjut</button>
               </Section>
             )}
 
-            {/* STEP: rep */}
+            {/* REP */}
             {currentStepName === 'rep' && (
-              <Section title="Frekuensi">
-                <ChipGrid
-                  items={repOptions}
-                  selected={rep}
-                  onSelect={selectRep}
-                  getColor={() => '#00d4aa'}
-                  columns={3}
-                />
+              <Section title="Frekuensi" t={t}>
+                <ChipGrid items={repOptions} selected={rep} onSelect={selectRep} getColor={() => t.accent} columns={3} t={t} />
               </Section>
             )}
 
-            {/* STEP: notes */}
+            {/* NOTES */}
             {currentStepName === 'notes' && (
-              <Section title="Catatan (opsional)">
-                <textarea
-                  value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder="Keterangan tambahan..."
-                  rows={3}
-                  style={{ ...styles.input, resize:'none', fontFamily:'inherit' }}
-                />
-                <button onClick={handleSubmit} style={{ ...styles.primaryBtn, marginTop:12, background:'#00d4aa', color:'#0f1117' }}>
+              <Section title="Catatan (opsional)" t={t}>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Keterangan tambahan..." rows={3}
+                  style={{ ...s.input, resize:'none', fontFamily:'inherit' }} />
+                <button onClick={handleSubmit} style={{ ...s.primaryBtn, marginTop:12, background: t.accent, color: isDark ? '#13141f' : '#fff' }}>
                   ✓ Catat
                 </button>
-                {notes === '' && (
-                  <button onClick={handleSubmit} style={{ ...styles.ghostBtn, marginTop:8 }}>
-                    Skip & Catat
-                  </button>
+                {!notes && (
+                  <button onClick={handleSubmit} style={{ ...s.ghostBtn, marginTop:8 }}>Skip & Catat</button>
                 )}
               </Section>
             )}
@@ -551,25 +564,21 @@ export default function App() {
         {tab === 'input' && submitted && (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20, paddingTop:40 }}>
             <div style={{ fontSize:56 }}>✓</div>
-            <div style={{ color:'#00d4aa', fontSize:22, fontWeight:800 }}>Tercatat!</div>
-            <div style={{ color:'#6b7280', fontSize:13, textAlign:'center' }}>
-              {pendingCount > 0
-                ? `${pendingCount} transaksi menunggu sync`
-                : 'Sudah tersync ke Sheets'}
+            <div style={{ color: t.accent, fontSize:22, fontWeight:800 }}>Tercatat!</div>
+            <div style={{ color: t.subtext, fontSize:13, textAlign:'center' }}>
+              {pendingCount > 0 ? `${pendingCount} transaksi menunggu sync` : 'Sudah tersync ke Sheets'}
             </div>
-            <button onClick={reset} style={{ ...styles.primaryBtn, width:160 }}>+ Catat Lagi</button>
-            <button onClick={() => { reset(); setTab('history'); }} style={{ ...styles.ghostBtn, width:160 }}>
-              Lihat Riwayat
-            </button>
+            <button onClick={reset} style={{ ...s.primaryBtn, width:160 }}>+ Catat Lagi</button>
+            <button onClick={() => { reset(); setTab('history'); }} style={{ ...s.ghostBtn, width:160 }}>Lihat Riwayat</button>
           </div>
         )}
 
-        {/* ── HISTORY TAB ───────────────────────────────── */}
+        {/* ── HISTORY ───────────────────────────────────── */}
         {tab === 'history' && (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {history.length === 0
-              ? <div style={{ color:'#4b5563', textAlign:'center', paddingTop:40, fontSize:13 }}>Belum ada transaksi</div>
-              : history.map((item, i) => <HistoryItem key={i} item={item} />)
+              ? <div style={{ color: t.subtext, textAlign:'center', paddingTop:40, fontSize:13 }}>Belum ada transaksi</div>
+              : history.map((item, i) => <HistoryItem key={i} item={item} t={t} />)
             }
           </div>
         )}
@@ -578,61 +587,3 @@ export default function App() {
     </div>
   );
 }
-
-// ── SECTION WRAPPER ──────────────────────────────────────────
-function Section({ title, children }) {
-  return (
-    <div>
-      <div style={{ fontSize:11, color:'#6b7280', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-// ── STYLES ───────────────────────────────────────────────────
-const styles = {
-  screen: {
-    background:'#0f1117', minHeight:'100dvh', maxWidth:430, margin:'0 auto',
-    display:'flex', flexDirection:'column', fontFamily:"'Sora', sans-serif",
-    color:'#e8eaf0',
-  },
-  header: {
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    padding:'16px 20px 12px', borderBottom:'1px solid #1a1d27',
-  },
-  tabs: {
-    display:'flex', borderBottom:'1px solid #1a1d27',
-  },
-  tabBtn: {
-    flex:1, background:'none', border:'none', padding:'12px',
-    fontSize:13, fontWeight:600, cursor:'pointer', transition:'all 0.15s',
-  },
-  content: {
-    flex:1, padding:'20px 16px', overflowY:'auto',
-  },
-  backBtn: {
-    background:'none', border:'none', color:'#6b7280',
-    fontSize:12, cursor:'pointer', padding:0, textAlign:'left',
-  },
-  label: {
-    display:'block', fontSize:11, color:'#6b7280',
-    fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6,
-  },
-  input: {
-    width:'100%', background:'#222536', border:'1.5px solid #2a2d40',
-    borderRadius:10, padding:'12px 14px', color:'#e8eaf0',
-    fontSize:14, outline:'none', boxSizing:'border-box',
-  },
-  primaryBtn: {
-    width:'100%', background:'#1a1d27', border:'1.5px solid #00d4aa',
-    color:'#00d4aa', borderRadius:12, padding:'15px',
-    fontSize:15, fontWeight:700, cursor:'pointer',
-  },
-  ghostBtn: {
-    width:'100%', background:'none', border:'1.5px solid #2a2d40',
-    color:'#6b7280', borderRadius:12, padding:'13px',
-    fontSize:13, fontWeight:600, cursor:'pointer',
-  },
-};
