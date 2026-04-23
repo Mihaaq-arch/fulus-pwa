@@ -35,3 +35,26 @@ export async function postTransaction(tx) {
   // tapi request tetap terkirim dan GAS tetap proses
   return 'sent';
 }
+
+// Fetch summary — cache 15 menit
+export async function fetchSummary(forceRefresh = false) {
+  const CACHE_KEY = "fulus_summary";
+  const CACHE_TTL = 15 * 60 * 1000;
+
+  if (!forceRefresh) {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL) return data;
+      }
+    } catch (_) {}
+  }
+
+  const res  = await fetch(`${GAS_URL}?action=summary&key=${GAS_KEY}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "GAS error");
+
+  localStorage.setItem(CACHE_KEY, JSON.stringify({ data: json.data, ts: Date.now() }));
+  return json.data;
+}

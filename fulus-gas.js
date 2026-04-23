@@ -191,12 +191,52 @@ function doGet(e) {
       };
 
     } else if (action === "insert") {
-      // Terima transaksi via GET (CORS workaround)
       const dataRaw = e && e.parameter && e.parameter.data ? e.parameter.data : null;
       if (!dataRaw) throw new Error("data wajib diisi");
       const tx = JSON.parse(dataRaw);
       const id = insertTransaction(tx);
       result = { ok: true, id };
+
+    } else if (action === "summary") {
+      const src = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_SHEET);
+      if (!src) throw new Error("Sheet Transactions tidak ditemukan");
+      const raw  = src.getDataRange().getValues();
+      const rows = raw.slice(1).filter(r => String(r[0]).trim() !== "");
+      const txs  = parseRows(rows);
+
+      const allAccounts = getAccounts();
+      const owners = [...new Set(allAccounts.map(a => a.owner))].filter(o => o !== "Unown");
+
+      const summaryData = {};
+      for (const owner of owners) {
+        const s = getOwnerStats(txs, owner);
+        // Ambil bulan ini
+        const now = new Date();
+        const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+        const monthData = s.byMonth[thisMonth] || { income:0, expense:0, categories:{} };
+        summaryData[owner] = {
+          total:    { income: s.income, expense: s.expense, net: s.net },
+          thisMonth:{ income: monthData.income, expense: monthData.expense, net: monthData.income - monthData.expense },
+          cats:     s.cats,
+          estimatedMonthly: s.estimatedMonthly,
+          impulsive: s.impulsive,
+          routine:   s.routine,
+          months:   s.months.sort().slice(-3).map(m => ({
+            month: m,
+            income: s.byMonth[m].income,
+            expense: s.byMonth[m].expense,
+            net: s.byMonth[m].income - s.byMonth[m].expense,
+          })),
+        };
+      }
+
+      // Bridge balances
+      const bridges = {};
+      for (const b of BRIDGE_ACCOUNTS) {
+        bridges[b] = getBridgeBalance(txs, b);
+      }
+
+      result = { ok: true, data: { owners, summary: summaryData, bridges } };
 
     } else {
       result = { ok: true, message: "Fulus GAS v3 is alive" };

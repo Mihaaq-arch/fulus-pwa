@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchConfig } from './gas.js';
+import { fetchConfig, fetchSummary } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 
 // ── THEME ─────────────────────────────────────────────────────
@@ -178,6 +178,186 @@ function Section({ title, children, t }) {
   );
 }
 
+
+// ── SUMMARY VIEW ──────────────────────────────────────────────
+const OWNER_COLORS_SUMMARY = {
+  Personal:  '#00cfa8',
+  Servo:     '#60a5fa',
+  House:     '#c084fc',
+  ElFamilia: '#f87171',
+  Investment:'#fbbf24',
+};
+
+function idr(n) {
+  if (!n && n !== 0) return 'Rp0';
+  const abs = Math.abs(Math.round(n));
+  const fmt = abs.toLocaleString('id-ID');
+  return (n < 0 ? '-Rp' : 'Rp') + fmt;
+}
+
+function SummaryView({ summary, loading, err, onRefresh, t }) {
+  const [openOwner, setOpenOwner] = useState(null);
+
+  if (loading) return (
+    <div style={{ textAlign:'center', paddingTop:60, color: t.subtext, fontSize:13 }}>
+      Memuat summary...
+    </div>
+  );
+
+  if (err) return (
+    <div style={{ textAlign:'center', paddingTop:40 }}>
+      <div style={{ color:'#f87171', fontSize:13, marginBottom:12 }}>Gagal load: {err}</div>
+      <button onClick={onRefresh} style={{ background:'none', border:`1px solid ${t.border}`, color: t.subtext, borderRadius:8, padding:'8px 16px', cursor:'pointer', fontSize:12 }}>Coba lagi</button>
+    </div>
+  );
+
+  if (!summary) return (
+    <div style={{ textAlign:'center', paddingTop:60, color: t.subtext, fontSize:13 }}>
+      Belum ada data
+    </div>
+  );
+
+  const { owners, summary: data, bridges } = summary;
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      {/* Refresh */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <span style={{ fontSize:11, color: t.subtext }}>Cache 15 menit</span>
+        <button onClick={onRefresh} style={{ background:'none', border:`1px solid ${t.border}`, color: t.accent, borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:11, fontWeight:600 }}>
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Per owner cards */}
+      {owners.map(owner => {
+        const s = data[owner];
+        if (!s) return null;
+        const color = OWNER_COLORS_SUMMARY[owner] || '#6b7280';
+        const isOpen = openOwner === owner;
+        const net = s.thisMonth.net;
+        const sortedCats = Object.entries(s.cats || {}).sort((a,b) => b[1]-a[1]).slice(0, 5);
+
+        return (
+          <div key={owner} style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, overflow:'hidden' }}>
+            {/* Header */}
+            <button onClick={() => setOpenOwner(isOpen ? null : owner)} style={{
+              width:'100%', background:'none', border:'none', cursor:'pointer',
+              padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'space-between'
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{ width:8, height:8, borderRadius:'50%', background: color }} />
+                <span style={{ fontSize:14, fontWeight:700, color: t.text }}>{owner}</span>
+                <span style={{ fontSize:11, color: t.subtext, background: t.card, padding:'2px 8px', borderRadius:6 }}>
+                  Est. {idr(s.estimatedMonthly)}/bln
+                </span>
+              </div>
+              <div style={{ textAlign:'right' }}>
+                <div style={{ fontSize:14, fontWeight:700, color: net >= 0 ? '#4ade80' : '#f87171', fontFamily:'DM Mono, monospace' }}>
+                  {net >= 0 ? '+' : ''}{idr(net)}
+                </div>
+                <div style={{ fontSize:10, color: t.subtext }}>bulan ini</div>
+              </div>
+            </button>
+
+            {/* Expanded */}
+            {isOpen && (
+              <div style={{ padding:'0 16px 16px', borderTop:`1px solid ${t.border}` }}>
+                {/* Bulan ini */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:12 }}>
+                  {[
+                    { label:'Masuk', value: s.thisMonth.income, color:'#4ade80' },
+                    { label:'Keluar', value: s.thisMonth.expense, color:'#f87171' },
+                    { label:'Net', value: s.thisMonth.net, color: s.thisMonth.net >= 0 ? '#4ade80' : '#f87171' },
+                  ].map(({ label, value, color: c }) => (
+                    <div key={label} style={{ background: t.card, borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
+                      <div style={{ fontSize:10, color: t.subtext, marginBottom:4 }}>{label}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color: c, fontFamily:'DM Mono, monospace' }}>{idr(value)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 3 bulan terakhir */}
+                {s.months && s.months.length > 0 && (
+                  <div style={{ marginTop:12 }}>
+                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>3 Bulan Terakhir</div>
+                    {s.months.map(m => (
+                      <div key={m.month} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:`1px solid ${t.border}` }}>
+                        <span style={{ fontSize:12, color: t.subtext }}>{m.month}</span>
+                        <div style={{ display:'flex', gap:12 }}>
+                          <span style={{ fontSize:12, color:'#4ade80', fontFamily:'DM Mono, monospace' }}>+{idr(m.income)}</span>
+                          <span style={{ fontSize:12, color:'#f87171', fontFamily:'DM Mono, monospace' }}>-{idr(m.expense)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Top kategori */}
+                {sortedCats.length > 0 && (
+                  <div style={{ marginTop:12 }}>
+                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Top Pengeluaran</div>
+                    {sortedCats.map(([cat, val]) => {
+                      const total = Object.values(s.cats).reduce((a,b) => a+b, 0);
+                      const pct = total > 0 ? ((val/total)*100).toFixed(0) : 0;
+                      return (
+                        <div key={cat} style={{ marginBottom:6 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                            <span style={{ fontSize:12, color: t.text }}>{cat}</span>
+                            <span style={{ fontSize:12, color: t.subtext, fontFamily:'DM Mono, monospace' }}>{idr(val)} ({pct}%)</span>
+                          </div>
+                          <div style={{ height:4, background: t.border, borderRadius:2 }}>
+                            <div style={{ height:4, background: color, borderRadius:2, width:`${pct}%`, transition:'width 0.4s' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pola impulsif */}
+                {(s.impulsive + s.routine) > 0 && (
+                  <div style={{ marginTop:12, background: t.card, borderRadius:10, padding:'10px 12px' }}>
+                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>Pola Pengeluaran</div>
+                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                      <span style={{ fontSize:12, color: t.text }}>One-time (impulsif)</span>
+                      <span style={{ fontSize:12, fontFamily:'DM Mono, monospace', color: '#fbbf24' }}>{idr(s.impulsive)}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
+                      <span style={{ fontSize:12, color: t.text }}>Recurring (rutin)</span>
+                      <span style={{ fontSize:12, fontFamily:'DM Mono, monospace', color: '#4ade80' }}>{idr(s.routine)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Bridge balances */}
+      {bridges && Object.keys(bridges).length > 0 && (
+        <div style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, padding:'14px 16px' }}>
+          <div style={{ fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>Bridge Accounts</div>
+          {Object.entries(bridges).map(([bridge, net]) => (
+            <div key={bridge} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:`1px solid ${t.border}` }}>
+              <span style={{ fontSize:12, color: t.text }}>{bridge}</span>
+              <span style={{
+                fontSize:12, fontFamily:'DM Mono, monospace',
+                color: Math.abs(net) < 1000 ? '#4ade80' : '#fbbf24'
+              }}>
+                {Math.abs(net) < 1000 ? '✓ Settled' : idr(net)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── MAIN APP ──────────────────────────────────────────────────
 export default function App() {
   const [isDark, setIsDark] = useState(() => {
@@ -202,6 +382,9 @@ export default function App() {
   const [syncing, setSyncing]   = useState(false);
   const [syncMsg, setSyncMsg]   = useState('');
   const [history, setHistory]   = useState([]);
+  const [summary, setSummary]   = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryErr, setSummaryErr] = useState(null);
 
   // Form state
   const [step, setStep]         = useState(0);
@@ -238,7 +421,19 @@ export default function App() {
 
   useEffect(() => {
     if (tab === 'history') refreshHistory();
+    if (tab === 'summary') loadSummary();
   }, [tab]);
+
+  const loadSummary = async (forceRefresh = false) => {
+    setSummaryLoading(true); setSummaryErr(null);
+    try {
+      const data = await fetchSummary(forceRefresh);
+      setSummary(data);
+    } catch (err) {
+      setSummaryErr(err.message);
+    }
+    setSummaryLoading(false);
+  };
 
   const accounts   = config?.accounts || [];
   const categories = config?.categories || [];
@@ -388,12 +583,13 @@ export default function App() {
 
       {/* Tabs */}
       <div style={s.tabs}>
-        {['input','history'].map(tb => (
+        {[['input','💸 Catat'],['history','📋 Riwayat'],['summary','📊 Summary']].map(([tb, label]) => (
           <button key={tb} onClick={() => setTab(tb)} style={{
             ...s.tabBtn,
             color: tab === tb ? t.accent : t.subtext,
             borderBottom: tab === tb ? `2px solid ${t.accent}` : '2px solid transparent',
-          }}>{tb === 'input' ? '💸 Catat' : '📋 Riwayat'}</button>
+            fontSize: 12,
+          }}>{label}</button>
         ))}
       </div>
 
@@ -581,6 +777,11 @@ export default function App() {
               : history.map((item, i) => <HistoryItem key={i} item={item} t={t} />)
             }
           </div>
+        )}
+
+        {/* ── SUMMARY ───────────────────────────────────── */}
+        {tab === 'summary' && (
+          <SummaryView summary={summary} loading={summaryLoading} err={summaryErr} onRefresh={() => loadSummary(true)} t={t} />
         )}
 
       </div>
