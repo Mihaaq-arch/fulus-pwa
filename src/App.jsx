@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchConfig, fetchSummary } from './gas.js';
+import { fetchConfig, fetchSummary, fetchBalances } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 
 // ── THEME ─────────────────────────────────────────────────────
@@ -195,7 +195,7 @@ function idr(n) {
   return (n < 0 ? '-Rp' : 'Rp') + fmt;
 }
 
-function SummaryView({ summary, loading, err, onRefresh, t }) {
+function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRefresh, t }) {
   const [openOwner, setOpenOwner] = useState(null);
 
   if (loading) return (
@@ -230,6 +230,50 @@ function SummaryView({ summary, loading, err, onRefresh, t }) {
           ↻ Refresh
         </button>
       </div>
+
+      {/* Saldo terkini per owner */}
+      {balLoading && <div style={{ color: t.subtext, fontSize:12, textAlign:'center' }}>Memuat saldo...</div>}
+      {balErr && <div style={{ color:'#f87171', fontSize:12 }}>Gagal load saldo: {balErr}</div>}
+      {balances && (
+        <div style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, overflow:'hidden' }}>
+          <div style={{ padding:'12px 16px', borderBottom:`1px solid ${t.border}` }}>
+            <span style={{ fontSize:12, fontWeight:700, color: t.text }}>💰 Saldo Terkini</span>
+          </div>
+          {Object.entries(balances.byOwner).map(([owner, { accounts, total }]) => {
+            const color = OWNER_COLORS_SUMMARY[owner] || '#6b7280';
+            const est   = balances.estimates?.[owner] || 0;
+            const sisa  = total - est;
+            return (
+              <div key={owner} style={{ borderBottom:`1px solid ${t.border}` }}>
+                {/* Owner header */}
+                <div style={{ padding:'10px 16px', background: t.card, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ width:6, height:6, borderRadius:'50%', background: color }} />
+                    <span style={{ fontSize:12, fontWeight:700, color: t.text }}>{owner}</span>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: total >= 0 ? t.text : '#f87171', fontFamily:'DM Mono, monospace' }}>
+                      {idr(total)}
+                    </div>
+                    <div style={{ fontSize:10, color: sisa >= 0 ? '#4ade80' : '#f87171' }}>
+                      sisa ~{idr(sisa)} setelah est. pengeluaran
+                    </div>
+                  </div>
+                </div>
+                {/* Per akun */}
+                {accounts.map(({ name, balance }) => (
+                  <div key={name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 16px 8px 28px', borderTop:`1px solid ${t.border}` }}>
+                    <span style={{ fontSize:12, color: t.subtext }}>{name}</span>
+                    <span style={{ fontSize:12, fontFamily:'DM Mono, monospace', color: balance >= 0 ? t.text : '#f87171' }}>
+                      {idr(balance)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Per owner cards */}
       {owners.map(owner => {
@@ -385,6 +429,9 @@ export default function App() {
   const [summary, setSummary]   = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryErr, setSummaryErr] = useState(null);
+  const [balances, setBalances]     = useState(null);
+  const [balLoading, setBalLoading] = useState(false);
+  const [balErr, setBalErr]         = useState(null);
 
   // Form state
   const [step, setStep]         = useState(0);
@@ -421,8 +468,19 @@ export default function App() {
 
   useEffect(() => {
     if (tab === 'history') refreshHistory();
-    if (tab === 'summary') loadSummary();
+    if (tab === 'summary') { loadSummary(); loadBalances(); }
   }, [tab]);
+
+  const loadBalances = async (forceRefresh = false) => {
+    setBalLoading(true); setBalErr(null);
+    try {
+      const data = await fetchBalances(forceRefresh);
+      setBalances(data);
+    } catch (err) {
+      setBalErr(err.message);
+    }
+    setBalLoading(false);
+  };
 
   const loadSummary = async (forceRefresh = false) => {
     setSummaryLoading(true); setSummaryErr(null);
@@ -781,7 +839,7 @@ export default function App() {
 
         {/* ── SUMMARY ───────────────────────────────────── */}
         {tab === 'summary' && (
-          <SummaryView summary={summary} loading={summaryLoading} err={summaryErr} onRefresh={() => loadSummary(true)} t={t} />
+          <SummaryView summary={summary} loading={summaryLoading} err={summaryErr} balances={balances} balLoading={balLoading} balErr={balErr} onRefresh={() => { loadSummary(true); loadBalances(true); }} t={t} />
         )}
 
       </div>

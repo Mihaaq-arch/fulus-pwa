@@ -197,6 +197,45 @@ function doGet(e) {
       const id = insertTransaction(tx);
       result = { ok: true, id };
 
+    } else if (action === "balances") {
+      const src = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_SHEET);
+      if (!src) throw new Error("Sheet Transactions tidak ditemukan");
+      const raw  = src.getDataRange().getValues();
+      const rows = raw.slice(1).filter(r => String(r[0]).trim() !== "");
+      const txs  = parseRows(rows);
+      const allAccounts = getAccounts();
+
+      // Hitung saldo per akun dari semua transaksi
+      const balances = {};
+      for (const acc of allAccounts) {
+        balances[acc.name] = { owner: acc.owner, balance: 0 };
+      }
+      for (const tx of txs) {
+        if (tx.from && balances[tx.from] !== undefined) balances[tx.from].balance -= tx.amount;
+        if (tx.to   && balances[tx.to]   !== undefined) balances[tx.to].balance   += tx.amount;
+      }
+
+      // Group per owner, exclude Unown
+      const byOwner = {};
+      for (const [name, { owner, balance }] of Object.entries(balances)) {
+        if (owner === "Unown") continue;
+        if (!byOwner[owner]) byOwner[owner] = { accounts: [], total: 0 };
+        byOwner[owner].accounts.push({ name, balance });
+        byOwner[owner].total += balance;
+      }
+
+      // Estimasi pengeluaran bulan depan per owner (pakai estimatedMonthly)
+      const txsParsed = txs;
+      const allAcc2 = getAccounts();
+      const owners2 = [...new Set(allAcc2.map(a => a.owner))].filter(o => o !== "Unown");
+      const estimates = {};
+      for (const owner of owners2) {
+        const s = getOwnerStats(txsParsed, owner);
+        estimates[owner] = s.estimatedMonthly;
+      }
+
+      result = { ok: true, data: { byOwner, estimates } };
+
     } else if (action === "summary") {
       const src = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_SHEET);
       if (!src) throw new Error("Sheet Transactions tidak ditemukan");

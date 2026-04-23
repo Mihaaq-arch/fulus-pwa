@@ -58,3 +58,26 @@ export async function fetchSummary(forceRefresh = false) {
   localStorage.setItem(CACHE_KEY, JSON.stringify({ data: json.data, ts: Date.now() }));
   return json.data;
 }
+
+// Fetch balances — cache 10 menit
+export async function fetchBalances(forceRefresh = false) {
+  const CACHE_KEY = "fulus_balances";
+  const CACHE_TTL = 10 * 60 * 1000;
+
+  if (!forceRefresh) {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL) return data;
+      }
+    } catch (_) {}
+  }
+
+  const res  = await fetch(`${GAS_URL}?action=balances&key=${GAS_KEY}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "GAS error");
+
+  localStorage.setItem(CACHE_KEY, JSON.stringify({ data: json.data, ts: Date.now() }));
+  return json.data;
+}
