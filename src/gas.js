@@ -23,20 +23,20 @@ export async function fetchConfig(forceRefresh = false) {
   return json.data;
 }
 
-// Kirim transaksi — pakai no-cors karena GAS redirect
-// Data tetap masuk ke Sheets, kita skip baca response
+// Send transaction via no-cors — GAS redirects block CORS
+// Request still reaches GAS and is processed; we skip reading the opaque response
 export async function postTransaction(tx) {
   const payload = encodeURIComponent(JSON.stringify(tx));
   await fetch(
     `${GAS_URL}?action=insert&key=${GAS_KEY}&data=${payload}`,
     { method: 'GET', mode: 'no-cors' }
   );
-  // no-cors = response opaque, tidak bisa dibaca
-  // tapi request tetap terkirim dan GAS tetap proses
+  // no-cors = opaque response, unreadable by browser
+  // but the request is delivered and GAS processes it
   return 'sent';
 }
 
-// Fetch summary — cache 15 menit
+// Fetch summary stats — cached for 15 min
 export async function fetchSummary(forceRefresh = false) {
   const CACHE_KEY = "fulus_summary";
   const CACHE_TTL = 15 * 60 * 1000;
@@ -59,7 +59,7 @@ export async function fetchSummary(forceRefresh = false) {
   return json.data;
 }
 
-// Fetch balances — cache 10 menit
+// Fetch account balances — cached for 10 min
 export async function fetchBalances(forceRefresh = false) {
   const CACHE_KEY = "fulus_balances";
   const CACHE_TTL = 10 * 60 * 1000;

@@ -1,6 +1,6 @@
 // ============================================================
 // FULUS — OFFLINE QUEUE (IndexedDB)
-// Transaksi disimpan dulu di sini, sync ke GAS di background
+// Transactions are saved here first, then synced to GAS in the background
 // ============================================================
 import { openDB } from 'idb';
 import { postTransaction } from './gas.js';
@@ -20,7 +20,7 @@ async function getDB() {
   });
 }
 
-// Tambah transaksi ke antrian lokal
+// Add transaction to the local queue
 export async function enqueue(tx) {
   const db = await getDB();
   const localId = await db.add(STORE_NAME, {
@@ -31,20 +31,20 @@ export async function enqueue(tx) {
   return localId;
 }
 
-// Ambil semua pending
+// Get all pending transactions
 export async function getPending() {
   const db = await getDB();
   return db.getAllFromIndex(STORE_NAME, 'status', 'pending');
 }
 
-// Ambil semua (untuk history lokal)
+// Get all transactions (for local history view)
 export async function getAll() {
   const db = await getDB();
   const all = await db.getAll(STORE_NAME);
   return all.reverse();
 }
 
-// Sync semua pending ke GAS
+// Sync all pending transactions to GAS
 export async function syncQueue(onProgress) {
   const pending = await getPending();
   if (pending.length === 0) return { synced: 0, failed: 0 };
@@ -58,7 +58,7 @@ export async function syncQueue(onProgress) {
       await db.put(STORE_NAME, { ...item, status: 'synced', gasId, syncedAt: new Date().toISOString() });
       synced++;
     } catch (err) {
-      // Kalau network error (offline), tetap pending bukan error
+      // Network error (offline) — keep as pending, not error
       const isNetworkError = err instanceof TypeError && err.message.includes('fetch');
       await db.put(STORE_NAME, { ...item, status: isNetworkError ? 'pending' : 'error', error: err.message });
       if (!isNetworkError) failed++;
@@ -69,7 +69,7 @@ export async function syncQueue(onProgress) {
   return { synced, failed };
 }
 
-// Hapus semua yang sudah synced (cleanup)
+// Remove all synced transactions (cleanup)
 export async function clearSynced() {
   const db   = await getDB();
   const all  = await db.getAllFromIndex(STORE_NAME, 'status', 'synced');
@@ -79,7 +79,7 @@ export async function clearSynced() {
   return all.length;
 }
 
-// Hitung pending count
+// Get count of pending transactions
 export async function getPendingCount() {
   const pending = await getPending();
   return pending.length;

@@ -3,7 +3,7 @@ import { fetchConfig, fetchSummary, fetchBalances } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 
 // ── VERSION ───────────────────────────────────────────────────
-const APP_VERSION = "0.4.0";
+const APP_VERSION = "0.5.0";
 
 // ── THEME ─────────────────────────────────────────────────────
 const DARK = {
@@ -37,8 +37,8 @@ const OWNER_COLORS = {
 };
 
 const TYPE_CONFIG = {
-  Expense:  { label: 'Keluar',   icon: '↓', color: '#f87171' },
-  Income:   { label: 'Masuk',    icon: '↑', color: '#4ade80' },
+  Expense:  { label: 'Expense',   icon: '↓', color: '#f87171' },
+  Income:   { label: 'Income',    icon: '↑', color: '#4ade80' },
   Transfer: { label: 'Transfer', icon: '⇄', color: '#60a5fa' },
 };
 
@@ -203,20 +203,20 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
 
   if (loading) return (
     <div style={{ textAlign:'center', paddingTop:60, color: t.subtext, fontSize:13 }}>
-      Memuat summary...
+      Loading summary...
     </div>
   );
 
   if (err) return (
     <div style={{ textAlign:'center', paddingTop:40 }}>
-      <div style={{ color:'#f87171', fontSize:13, marginBottom:12 }}>Gagal load: {err}</div>
+      <div style={{ color:'#f87171', fontSize:13, marginBottom:12 }}>Failed to load: {err}</div>
       <button onClick={onRefresh} style={{ background:'none', border:`1px solid ${t.border}`, color: t.subtext, borderRadius:8, padding:'8px 16px', cursor:'pointer', fontSize:12 }}>Coba lagi</button>
     </div>
   );
 
   if (!summary) return (
     <div style={{ textAlign:'center', paddingTop:60, color: t.subtext, fontSize:13 }}>
-      Belum ada data
+      No data yet
     </div>
   );
 
@@ -228,19 +228,19 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
       {/* Refresh */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize:11, color: t.subtext }}>Cache 15 menit</span>
+        <span style={{ fontSize:11, color: t.subtext }}>Cached for 15 min</span>
         <button onClick={onRefresh} style={{ background:'none', border:`1px solid ${t.border}`, color: t.accent, borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:11, fontWeight:600 }}>
           ↻ Refresh
         </button>
       </div>
 
       {/* Saldo terkini per owner */}
-      {balLoading && <div style={{ color: t.subtext, fontSize:12, textAlign:'center' }}>Memuat saldo...</div>}
-      {balErr && <div style={{ color:'#f87171', fontSize:12 }}>Gagal load saldo: {balErr}</div>}
+      {balLoading && <div style={{ color: t.subtext, fontSize:12, textAlign:'center' }}>Loading balances...</div>}
+      {balErr && <div style={{ color:'#f87171', fontSize:12 }}>Failed to load balances: {balErr}</div>}
       {balances && (
         <div style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, overflow:'hidden' }}>
           <div style={{ padding:'12px 16px', borderBottom:`1px solid ${t.border}` }}>
-            <span style={{ fontSize:12, fontWeight:700, color: t.text }}>💰 Saldo Terkini</span>
+            <span style={{ fontSize:12, fontWeight:700, color: t.text }}>💰 Current Balances</span>
           </div>
           {Object.entries(balances.byOwner).map(([owner, { accounts, total }]) => {
             const color = OWNER_COLORS_SUMMARY[owner] || '#6b7280';
@@ -259,7 +259,7 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
                       {idr(total)}
                     </div>
                     <div style={{ fontSize:10, color: sisa >= 0 ? '#4ade80' : '#f87171' }}>
-                      sisa ~{idr(sisa)} setelah est. pengeluaran
+                      est. remaining ~{idr(sisa)} after projected expenses
                     </div>
                   </div>
                 </div>
@@ -305,7 +305,7 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
                 <div style={{ fontSize:14, fontWeight:700, color: net >= 0 ? '#4ade80' : '#f87171', fontFamily:'DM Mono, monospace' }}>
                   {net >= 0 ? '+' : ''}{idr(net)}
                 </div>
-                <div style={{ fontSize:10, color: t.subtext }}>bulan ini</div>
+                <div style={{ fontSize:10, color: t.subtext }}>this month</div>
               </div>
             </button>
 
@@ -329,7 +329,7 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
                 {/* 3 bulan terakhir */}
                 {s.months && s.months.length > 0 && (
                   <div style={{ marginTop:12 }}>
-                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>3 Bulan Terakhir</div>
+                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Last 3 Months</div>
                     {s.months.map(m => (
                       <div key={m.month} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:`1px solid ${t.border}` }}>
                         <span style={{ fontSize:12, color: t.subtext }}>{m.month}</span>
@@ -345,7 +345,7 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
                 {/* Top kategori */}
                 {sortedCats.length > 0 && (
                   <div style={{ marginTop:12 }}>
-                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Top Pengeluaran</div>
+                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Top Expenses</div>
                     {sortedCats.map(([cat, val]) => {
                       const total = Object.values(s.cats).reduce((a,b) => a+b, 0);
                       const pct = total > 0 ? ((val/total)*100).toFixed(0) : 0;
@@ -367,13 +367,13 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
                 {/* Pola impulsif */}
                 {(s.impulsive + s.routine) > 0 && (
                   <div style={{ marginTop:12, background: t.card, borderRadius:10, padding:'10px 12px' }}>
-                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>Pola Pengeluaran</div>
+                    <div style={{ fontSize:10, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>Spending Pattern</div>
                     <div style={{ display:'flex', justifyContent:'space-between' }}>
-                      <span style={{ fontSize:12, color: t.text }}>One-time (impulsif)</span>
+                      <span style={{ fontSize:12, color: t.text }}>One-time (unplanned)</span>
                       <span style={{ fontSize:12, fontFamily:'DM Mono, monospace', color: '#fbbf24' }}>{idr(s.impulsive)}</span>
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
-                      <span style={{ fontSize:12, color: t.text }}>Recurring (rutin)</span>
+                      <span style={{ fontSize:12, color: t.text }}>Recurring (planned)</span>
                       <span style={{ fontSize:12, fontFamily:'DM Mono, monospace', color: '#4ade80' }}>{idr(s.routine)}</span>
                     </div>
                   </div>
@@ -605,14 +605,14 @@ export default function App() {
 
   if (loading) return (
     <div style={{ ...s.screen, justifyContent:'center', alignItems:'center' }}>
-      <div style={{ color: t.accent, fontSize:14 }}>Memuat Fulus...</div>
+      <div style={{ color: t.accent, fontSize:14 }}>Loading Fulus...</div>
     </div>
   );
 
   if (configErr) return (
     <div style={{ ...s.screen, justifyContent:'center', alignItems:'center', padding:32 }}>
       <div style={{ color:'#f87171', fontSize:13, textAlign:'center' }}>
-        Gagal load config<br /><span style={{ color: t.subtext, fontSize:11 }}>{configErr}</span>
+        Failed to load config<br /><span style={{ color: t.subtext, fontSize:11 }}>{configErr}</span>
       </div>
     </div>
   );
@@ -645,7 +645,7 @@ export default function App() {
 
       {/* Tabs */}
       <div style={s.tabs}>
-        {[['input','💸 Catat'],['history','📋 Riwayat'],['summary','📊 Summary']].map(([tb, label]) => (
+        {[['input','💸 Record'],['history','📋 History'],['summary','📊 Summary']].map(([tb, label]) => (
           <button key={tb} onClick={() => setTab(tb)} style={{
             ...s.tabBtn,
             color: tab === tb ? t.accent : t.subtext,
@@ -662,11 +662,11 @@ export default function App() {
         {tab === 'input' && !submitted && (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             <StepDots total={totalSteps} current={step} t={t} />
-            {step > 0 && <button onClick={goBack} style={s.backBtn}>← Kembali</button>}
+            {step > 0 && <button onClick={goBack} style={s.backBtn}>← Back</button>}
 
             {/* TYPE */}
             {currentStepName === 'type' && (
-              <Section title="Jenis transaksi" t={t}>
+              <Section title="Transaction type" t={t}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
                   {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
                     <button key={key} onClick={() => selectType(key)} style={{
@@ -686,7 +686,7 @@ export default function App() {
 
             {/* ACCOUNT */}
             {currentStepName === 'account' && (
-              <Section title={type === 'Income' ? 'Masuk ke akun' : 'Dari akun'} t={t}>
+              <Section title={type === 'Income' ? 'Into account' : 'From account'} t={t}>
                 <ChipGrid
                   items={accounts.filter(a => a.owner !== 'Unown')}
                   selected={type === 'Income' ? toAcc : fromAcc}
@@ -704,7 +704,7 @@ export default function App() {
 
             {/* TO ACCOUNT */}
             {currentStepName === 'toAccount' && (
-              <Section title="Ke akun" t={t}>
+              <Section title="To account" t={t}>
                 <ChipGrid
                   items={accounts.filter(a => a.owner !== 'Unown' && a.name !== fromAcc)}
                   selected={toAcc}
@@ -729,7 +729,7 @@ export default function App() {
                       color: crossOwner ? t.accent : t.subtext,
                       borderRadius:10, padding:'10px 14px', fontSize:12, fontWeight:600, cursor:'pointer', width:'100%'
                     }}>
-                      {crossOwner ? '✓' : '○'} Dibayar akun lain (generate 2 baris)
+                      {crossOwner ? '✓' : '○'} Paid by another account (generates 2 entries)
                     </button>
                     {crossOwner && (
                       <div style={{ marginTop:8 }}>
@@ -747,22 +747,22 @@ export default function App() {
                   </div>
                 )}
 
-                <Separator label="Kategori" t={t} />
+                <Separator label="Category" t={t} />
 
                 {/* Search */}
                 <input
                   value={catSearch}
                   onChange={e => setCatSearch(e.target.value)}
-                  placeholder="Cari kategori..."
+                  placeholder="Search category..."
                   style={s.searchBox}
                 />
 
                 <div style={{ opacity: crossOwner && !crossTarget ? 0.3 : 1, pointerEvents: crossOwner && !crossTarget ? 'none' : 'auto' }}>
                   {crossOwner && !crossTarget && (
-                    <div style={{ fontSize:11, color:'#fbbf24', marginBottom:8 }}>Pilih akun yang bayar dulu</div>
+                    <div style={{ fontSize:11, color:'#fbbf24', marginBottom:8 }}>Select the paying account first</div>
                   )}
                   {filteredCats.length === 0
-                    ? <div style={{ color: t.subtext, fontSize:13, textAlign:'center', padding:'20px 0' }}>Tidak ada kategori</div>
+                    ? <div style={{ color: t.subtext, fontSize:13, textAlign:'center', padding:'20px 0' }}>No categories found</div>
                     : <ChipGrid
                         items={filteredCats}
                         selected={category}
@@ -778,40 +778,40 @@ export default function App() {
 
             {/* DOR */}
             {currentStepName === 'dor' && (
-              <Section title="Detail hutang/piutang" t={t}>
-                <label style={{ display:'block', fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>Orang</label>
-                <input value={dorPerson} onChange={e => setDorPerson(e.target.value)} placeholder="Nama orang..." style={s.input} />
-                <label style={{ display:'block', fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, margin:'12px 0 6px' }}>Konteks</label>
+              <Section title="Debt / receivable detail" t={t}>
+                <label style={{ display:'block', fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>Person</label>
+                <input value={dorPerson} onChange={e => setDorPerson(e.target.value)} placeholder="Person name..." style={s.input} />
+                <label style={{ display:'block', fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, margin:'12px 0 6px' }}>Context</label>
                 <ChipGrid items={['Office', 'Personal']} selected={dorContext} onSelect={setDorContext} getColor={() => t.accent} columns={2} t={t} />
-                <button onClick={goNext} disabled={!dorPerson || !dorContext} style={{ ...s.primaryBtn, marginTop:16, opacity: (!dorPerson || !dorContext) ? 0.4 : 1 }}>Lanjut</button>
+                <button onClick={goNext} disabled={!dorPerson || !dorContext} style={{ ...s.primaryBtn, marginTop:16, opacity: (!dorPerson || !dorContext) ? 0.4 : 1 }}>Continue</button>
               </Section>
             )}
 
             {/* AMOUNT */}
             {currentStepName === 'amount' && (
-              <Section title="Nominal" t={t}>
+              <Section title="Amount" t={t}>
                 <NumPad value={amount} onChange={setAmount} t={t} />
-                <button onClick={goNext} disabled={!amount || amount === '0'} style={{ ...s.primaryBtn, marginTop:12, opacity: (!amount || amount === '0') ? 0.4 : 1 }}>Lanjut</button>
+                <button onClick={goNext} disabled={!amount || amount === '0'} style={{ ...s.primaryBtn, marginTop:12, opacity: (!amount || amount === '0') ? 0.4 : 1 }}>Continue</button>
               </Section>
             )}
 
             {/* REP */}
             {currentStepName === 'rep' && (
-              <Section title="Frekuensi" t={t}>
+              <Section title="Frequency" t={t}>
                 <ChipGrid items={repOptions} selected={rep} onSelect={selectRep} getColor={() => t.accent} columns={3} t={t} />
               </Section>
             )}
 
             {/* NOTES */}
             {currentStepName === 'notes' && (
-              <Section title="Catatan (opsional)" t={t}>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Keterangan tambahan..." rows={3}
+              <Section title="Notes (optional)" t={t}>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." rows={3}
                   style={{ ...s.input, resize:'none', fontFamily:'inherit' }} />
                 <button onClick={handleSubmit} style={{ ...s.primaryBtn, marginTop:12, background: t.accent, color: isDark ? '#13141f' : '#fff' }}>
-                  ✓ Catat
+                  ✓ Save
                 </button>
                 {!notes && (
-                  <button onClick={handleSubmit} style={{ ...s.ghostBtn, marginTop:8 }}>Skip & Catat</button>
+                  <button onClick={handleSubmit} style={{ ...s.ghostBtn, marginTop:8 }}>Skip & Save</button>
                 )}
               </Section>
             )}
@@ -822,12 +822,12 @@ export default function App() {
         {tab === 'input' && submitted && (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:20, paddingTop:40 }}>
             <div style={{ fontSize:56 }}>✓</div>
-            <div style={{ color: t.accent, fontSize:22, fontWeight:800 }}>Tercatat!</div>
+            <div style={{ color: t.accent, fontSize:22, fontWeight:800 }}>Saved!</div>
             <div style={{ color: t.subtext, fontSize:13, textAlign:'center' }}>
-              {pendingCount > 0 ? `${pendingCount} transaksi menunggu sync` : 'Sudah tersync ke Sheets'}
+              {pendingCount > 0 ? `${pendingCount} transaction(s) pending sync` : 'Synced to Sheets'}
             </div>
-            <button onClick={reset} style={{ ...s.primaryBtn, width:160 }}>+ Catat Lagi</button>
-            <button onClick={() => { reset(); setTab('history'); }} style={{ ...s.ghostBtn, width:160 }}>Lihat Riwayat</button>
+            <button onClick={reset} style={{ ...s.primaryBtn, width:160 }}>+ Record Again</button>
+            <button onClick={() => { reset(); setTab('history'); }} style={{ ...s.ghostBtn, width:160 }}>View History</button>
           </div>
         )}
 
@@ -835,7 +835,7 @@ export default function App() {
         {tab === 'history' && (
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {history.length === 0
-              ? <div style={{ color: t.subtext, textAlign:'center', paddingTop:40, fontSize:13 }}>Belum ada transaksi</div>
+              ? <div style={{ color: t.subtext, textAlign:'center', paddingTop:40, fontSize:13 }}>No transactions yet</div>
               : history.map((item, i) => <HistoryItem key={i} item={item} t={t} />)
             }
           </div>
