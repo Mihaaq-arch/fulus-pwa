@@ -24,15 +24,13 @@ const SOURCE_SHEET   = "Transactions";
 const SUMMARY_SHEET  = "📊 Monthly Summary";
 const ACCOUNTS_SHEET = "Accounts";
 const CATS_SHEET     = "Categories";
+const DOR_SHEET = "Debts / Reimbursements";
 
 const COL = { ID:1, AMOUNT:2, DATE:3, REP:4, FROM:5, TO:6, OWNER:7, TYPE:8, CATEGORY:9, SYSTEM_SUM:10, NOTES:11, LINK_ID:12 };
 
 // Secret key untuk autentikasi PWA — ganti dengan string random panjang
 // Generate di: https://randomkeygen.com (pakai "Fort Knox Passwords")
 const SECRET_KEY = "CHANGE_WITH_YOUR_KEY_MIN_32_CHARACTERS";
-
-const BRIDGE_ACCOUNTS = ["A-S Balance", "A-E Balance", "A-H Balance"];
-const DOR_SHEET = "Debts / Reimbursements";
 
 // ============================================================
 // SETUP — RUN ONCE to create lookup sheets
@@ -100,25 +98,34 @@ function setupSheets() {
 // ============================================================
 // LOOKUP HELPERS — read from sheets, not hardcoded
 // ============================================================
-function getAccounts() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACCOUNTS_SHEET);
+// Helper: get active rows from a certain sheet
+function getActiveRows(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return [];
-  const rows = sheet.getDataRange().getValues().slice(1);
-  return rows
-    .filter(r => r[2] === true || r[2] === "TRUE" || r[2] === "true")
+  return sheet.getDataRange().getValues()
+    .slice(1)
+    .filter(r => r[2] == true || String(r[2]).toLowerCase() === "true");
+    // using == true to capture boolean & string at the same time
+}
+
+function getAccounts() {
+  return getActiveRows(ACCOUNTS_SHEET)
     .map(r => ({ name: String(r[0]).trim(), owner: String(r[1]).trim() }));
 }
 
 function getCategories() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CATS_SHEET);
-  if (!sheet) return [];
-  const rows = sheet.getDataRange().getValues().slice(1);
-  return rows
-    .filter(r => r[2] === true || r[2] === "TRUE" || r[2] === "true")
+  return getActiveRows(CATS_SHEET)
     .map(r => ({ name: String(r[0]).trim(), type: String(r[1]).trim() }));
 }
 
-// derive owner dari nama akun, pakai lookup sheet
+// Get bridge accounts (Unown entries in Accounts sheet)
+function getBridgeAccounts() {
+  return getActiveRows(ACCOUNTS_SHEET)
+    .filter(r => String(r[1]).trim() === "Unown")
+    .map(r => String(r[0]).trim());
+}
+
+// derive owner from account name, using sheet lookup
 function lookupOwner(accountName) {
   if (!accountName || accountName.trim() === "") return "Unown";
   const accounts = getAccounts();
@@ -257,7 +264,7 @@ function doGet(e) {
 
       // Bridge balances
       const bridges = {};
-      for (const b of BRIDGE_ACCOUNTS) {
+      for (const b of getBridgeAccounts()) {
         bridges[b] = getBridgeBalance(txs, b);
       }
 
@@ -592,7 +599,7 @@ function getAnomalies(txs) {
       issues.push({ level:"⚠️", msg:`Follow-Up without partner: ${fu.id} | ${fu.category} | ${idr(fu.amount)}` });
     }
   }
-  const bridgeAccounts = BRIDGE_ACCOUNTS;
+  const bridgeAccounts = getBridgeAccounts();
   for (const bridge of bridgeAccounts) {
     const bal = getBridgeBalance(txs, bridge);
     if (Math.abs(bal) > 0) {
@@ -738,7 +745,7 @@ function writeFull(w, txs) {
 
   w.section("🔗  STATUS BRIDGE ACCOUNTS");
   w.write(["Bridge Account","Net Balance","Status","","",""], { bold:true, bg:"#eceff1" });
-  for (const bridge of BRIDGE_ACCOUNTS) {
+  for (const bridge of getBridgeAccounts()) {
     const net = getBridgeBalance(txs, bridge);
     w.write([bridge, idr(net), Math.abs(net)<1000?"✅ Settled":`🔵 Selisih ${idr(Math.abs(net))}`,"","",""],
       { bg: Math.abs(net)<1000?"#e8f5e9":"#fff3e0" });
