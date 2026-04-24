@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { fetchConfig, fetchSummary, fetchBalances, fetchDOR, postDOR, fetchTransactions } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 import { APP_VERSION, DARK, LIGHT, OWNER_COLORS, TYPE_CONFIG, REP_OPTIONS, idr, generatePairId } from './constants.js';
@@ -6,7 +6,7 @@ import { StepDots, Separator, Section } from './components/ui.jsx';
 import NumPad from './components/NumPad.jsx';
 import ChipGrid from './components/ChipGrid.jsx';
 import HistoryItem from './components/HistoryItem.jsx';
-import SummaryView from './components/SummaryView.jsx';
+const SummaryView = lazy(() => import('./components/SummaryView.jsx'));
 
 // ── MAIN APP ──────────────────────────────────────────────────
 export default function App() {
@@ -505,8 +505,10 @@ const handleSubmit = async () => {
         )}
 
         {/* ── SUMMARY ───────────────────────────────────── */}
-        {tab === 'summary' && (
-          <SummaryView summary={summary} loading={summaryLoading} err={summaryErr} balances={balances} balLoading={balLoading} balErr={balErr} onRefresh={() => { loadSummary(true); loadBalances(true); }} t={t} />
+        {tab === 'summary' && (  
+          <Suspense fallback={<div style={{ color: t.subtext, textAlign:'center', paddingTop:40, fontSize:13 }}>Loading...</div>}>
+            <SummaryView summary={summary} loading={summaryLoading} err={summaryErr} balances={balances} balLoading={balLoading} balErr={balErr} onRefresh={() => { loadSummary(true); loadBalances(true); }} t={t} />
+          </Suspense>
         )}
       {/* ── DOR ──────────────────────────────────────── */}
       {tab === 'dor' && (

@@ -218,7 +218,7 @@ export default function SummaryView({ summary, loading, err, balances, balLoadin
 }
 
 // ── NET CHART ─────────────────────────────────────────────────
-export default function NetChart({ owners, data, t }) {
+export function NetChart({ owners, data, t }) {
   // gather all unique months from all owners, sorted
   const allMonths = [...new Set(
     owners.flatMap(o => (data[o]?.months || []).map(m => m.month))
