@@ -554,16 +554,32 @@ const handleSubmit = async () => {
   if (crossOwner && crossTarget && type === 'Expense') {
     const ownerOfCross = accounts.find(a => a.name === crossTarget)?.owner || '';
     const bridge = bridgeMap[`${ownerOfFrom}-${ownerOfCross}`] || bridgeMap[`${ownerOfCross}-${ownerOfFrom}`] || 'A-S Balance';
-    const pairId = generatePairId();  
+    const pairId = generatePairId();
     txs.push({ ...txBase, from: fromAcc, to: '', linkId: pairId });
     txs.push({
       type: 'Follow-Up', category: 'Adjust', amount: parseInt(amount) || 0,
       rep: 'One Time', notes: `cross-owner: ${ownerOfFrom}→${ownerOfCross}`,
       from: crossTarget, to: bridge, date: new Date().toISOString(),
-      linkId: pairId,  
+      linkId: pairId,
     });
+
+  } else if (crossOwner && crossTarget && type === 'Income') {
+    const mainAcc    = toAcc || fromAcc;
+    const ownerMain  = accounts.find(a => a.name === mainAcc)?.owner || '';
+    const ownerCross = accounts.find(a => a.name === crossTarget)?.owner || '';
+    const bridge = bridgeMap[`${ownerMain}-${ownerCross}`] || bridgeMap[`${ownerCross}-${ownerMain}`] || 'A-S Balance';
+    const pairId = generatePairId();
+    txs.push({ ...txBase, from: '', to: mainAcc, linkId: pairId });
+    txs.push({
+      type: 'Follow-Up', category: 'Adjust', amount: parseInt(amount) || 0,
+      rep: 'One Time', notes: `cross-owner income: received by ${crossTarget}`,
+      from: crossTarget, to: bridge, date: new Date().toISOString(),
+      linkId: pairId,
+    });
+
   } else if (type === 'Income') {
     txs.push({ ...txBase, from: '', to: toAcc || fromAcc });
+
   } else {
     txs.push({ ...txBase, from: fromAcc, to: toAcc || '' });
   }
@@ -723,7 +739,7 @@ const handleSubmit = async () => {
             {currentStepName === 'category' && (
               <div>
                 {/* Cross-owner toggle */}
-                {type === 'Expense' && (
+                {(type === 'Expense' || type === 'Income') && (
                   <div style={{ marginBottom:12 }}>
                     <button onClick={() => { setCrossOwner(v => !v); setCrossTarget(''); }} style={{
                       background: crossOwner ? t.accent + '20' : t.card,
@@ -731,7 +747,7 @@ const handleSubmit = async () => {
                       color: crossOwner ? t.accent : t.subtext,
                       borderRadius:10, padding:'10px 14px', fontSize:12, fontWeight:600, cursor:'pointer', width:'100%'
                     }}>
-                      {crossOwner ? '✓' : '○'} Paid by another account (generates 2 entries)
+                      {crossOwner ? '✓' : '○'} {type === 'Income' ? 'Received by another account' : 'Paid by another account'} (generates 2 entries)
                     </button>
                     {crossOwner && (
                       <div style={{ marginTop:8 }}>
