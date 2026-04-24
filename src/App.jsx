@@ -547,33 +547,35 @@ export default function App() {
   const selectCat  = (c) => { setCategory(c.name); setTimeout(goNext, 200); };
   const selectRep  = (r) => { setRep(r); setTimeout(goNext, 200); };
 
-  const handleSubmit = async () => {
-    const txBase = { type, category, amount: parseInt(amount) || 0, rep, notes, date: new Date().toISOString() };
-    const txs = [];
+const handleSubmit = async () => {
+  const txBase = { type, category, amount: parseInt(amount) || 0, rep, notes, date: new Date().toISOString() };
+  const txs = [];
 
-    if (crossOwner && crossTarget && type === 'Expense') {
-      const ownerOfCross = accounts.find(a => a.name === crossTarget)?.owner || '';
-      const bridge = bridgeMap[`${ownerOfFrom}-${ownerOfCross}`] || bridgeMap[`${ownerOfCross}-${ownerOfFrom}`] || 'A-S Balance';
-      txs.push({ ...txBase, from: fromAcc, to: '' });
-      txs.push({
-        type: 'Follow-Up', category: 'Adjust', amount: parseInt(amount) || 0,
-        rep: 'One Time', notes: `cross-owner: ${ownerOfFrom}→${ownerOfCross}`,
-        from: crossTarget, to: bridge, date: new Date().toISOString(),
-      });
-    } else if (type === 'Income') {
-      txs.push({ ...txBase, from: '', to: toAcc || fromAcc });
-    } else {
-      txs.push({ ...txBase, from: fromAcc, to: toAcc || '' });
-    }
+  if (crossOwner && crossTarget && type === 'Expense') {
+    const ownerOfCross = accounts.find(a => a.name === crossTarget)?.owner || '';
+    const bridge = bridgeMap[`${ownerOfFrom}-${ownerOfCross}`] || bridgeMap[`${ownerOfCross}-${ownerOfFrom}`] || 'A-S Balance';
+    const pairId = generatePairId();  
+    txs.push({ ...txBase, from: fromAcc, to: '', linkId: pairId });
+    txs.push({
+      type: 'Follow-Up', category: 'Adjust', amount: parseInt(amount) || 0,
+      rep: 'One Time', notes: `cross-owner: ${ownerOfFrom}→${ownerOfCross}`,
+      from: crossTarget, to: bridge, date: new Date().toISOString(),
+      linkId: pairId,  
+    });
+  } else if (type === 'Income') {
+    txs.push({ ...txBase, from: '', to: toAcc || fromAcc });
+  } else {
+    txs.push({ ...txBase, from: fromAcc, to: toAcc || '' });
+  }
 
-    for (const tx of txs) await enqueue(tx);
-    await refreshPending();
-    setSubmitted(true);
+  for (const tx of txs) await enqueue(tx);
+  await refreshPending();
+  setSubmitted(true);
 
-    if (navigator.onLine) {
-      try { await syncQueue(); await refreshPending(); } catch (_) {}
-    }
-  };
+  if (navigator.onLine) {
+    try { await syncQueue(); await refreshPending(); } catch (_) {}
+  }
+};
 
   const handleSync = async () => {
     setSyncing(true); setSyncMsg('');
@@ -849,4 +851,17 @@ export default function App() {
       </div>
     </div>
   );
+}
+// ── PAIR ID ───────────────────────────────────────────────────
+// Dipakai untuk menghubungkan 2 transaksi yang terbentuk dari 1 input
+// Format sama dengan GAS generateId: YYMMDD-HHmmss
+function generatePairId() {
+  const d  = new Date();
+  const YY = String(d.getFullYear()).slice(2);
+  const MM = String(d.getMonth() + 1).padStart(2, '0');
+  const DD = String(d.getDate()).padStart(2, '0');
+  const HH = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${YY}${MM}${DD}-${HH}${mm}${ss}`;
 }

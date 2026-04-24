@@ -25,7 +25,7 @@ const SUMMARY_SHEET  = "📊 Monthly Summary";
 const ACCOUNTS_SHEET = "Accounts";
 const CATS_SHEET     = "Categories";
 
-const COL = { ID:1, AMOUNT:2, DATE:3, REP:4, FROM:5, TO:6, OWNER:7, TYPE:8, CATEGORY:9, SYSTEM_SUM:10, NOTES:11 };
+const COL = { ID:1, AMOUNT:2, DATE:3, REP:4, FROM:5, TO:6, OWNER:7, TYPE:8, CATEGORY:9, SYSTEM_SUM:10, NOTES:11, LINK_ID:12 };
 
 // Secret key untuk autentikasi PWA — ganti dengan string random panjang
 // Generate di: https://randomkeygen.com (pakai "Fort Knox Passwords")
@@ -347,6 +347,7 @@ function insertTransaction(data) {
   // Format tanggal
   const txDate = data.date ? new Date(data.date) : now;
 
+
   const row = [
     id,
     amount,
@@ -359,6 +360,7 @@ function insertTransaction(data) {
     data.category,
     systemSum,
     data.notes    || "",
+    data.linkId   || "",   
   ];
 
   sheet.appendRow(row);
@@ -391,6 +393,7 @@ function getRecentTransactions(limit) {
     type:     String(r[COL.TYPE-1]    || ""),
     category: String(r[COL.CATEGORY-1]|| ""),
     notes:    String(r[COL.NOTES-1]   || ""),
+    linkId:   String(r[COL.LINK_ID-1] || ""),
   }));
 }
 
