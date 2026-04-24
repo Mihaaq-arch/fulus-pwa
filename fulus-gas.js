@@ -246,7 +246,7 @@ function doGet(e) {
           estimatedMonthly: s.estimatedMonthly,
           impulsive: s.impulsive,
           routine:   s.routine,
-          months:   s.months.sort().slice(-3).map(m => ({
+          months:   s.months.sort().slice(-6).map(m => ({
             month: m,
             income: s.byMonth[m].income,
             expense: s.byMonth[m].expense,

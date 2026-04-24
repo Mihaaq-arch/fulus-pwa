@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchConfig, fetchSummary, fetchBalances, fetchDOR, postDOR, fetchTransactions } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
 
 // ── VERSION ───────────────────────────────────────────────────
 const APP_VERSION = "0.5.0";
@@ -181,6 +182,81 @@ function Section({ title, children, t }) {
   );
 }
 
+// ── NET CHART ─────────────────────────────────────────────────
+function NetChart({ owners, data, t }) {
+  // gather all unique months from all owners, sorted
+  const allMonths = [...new Set(
+    owners.flatMap(o => (data[o]?.months || []).map(m => m.month))
+  )].sort().slice(-6);
+
+  if (allMonths.length === 0) return null;
+
+  // reshape: per month, each owner as a field
+  const chartData = allMonths.map(month => {
+    const entry = { month: month.slice(2) }; // "2025-04" → "25-04"
+    for (const owner of owners) {
+      const found = data[owner]?.months?.find(m => m.month === month);
+      entry[owner] = found ? found.net : 0;
+    }
+    return entry;
+  });
+
+  const OWNER_CHART_COLORS = {
+    Personal:  '#00cfa8',
+    Servo:     '#60a5fa',
+    House:     '#c084fc',
+    ElFamilia: '#f87171',
+    Investment:'#fbbf24',
+  };
+
+  const formatY = (val) => {
+    if (Math.abs(val) >= 1000000) return `${(val/1000000).toFixed(1)}jt`;
+    if (Math.abs(val) >= 1000)    return `${(val/1000).toFixed(0)}rb`;
+    return String(val);
+  };
+
+  return (
+    <div style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, padding:'16px 8px 8px' }}>
+      <div style={{ fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12, paddingLeft:8 }}>
+        Net per Month (last 6 months)
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={chartData} margin={{ top:4, right:8, left:0, bottom:0 }} barCategoryGap="25%" barGap={2}>
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize:10, fill: t.subtext }}
+            axisLine={false} tickLine={false}
+          />
+          <YAxis
+            tickFormatter={formatY}
+            tick={{ fontSize:9, fill: t.subtext }}
+            axisLine={false} tickLine={false}
+            width={36}
+          />
+          <ReferenceLine y={0} stroke={t.border} strokeWidth={1} />
+          <Tooltip
+            formatter={(val, name) => [idr(val), name]}
+            contentStyle={{ background: t.card, border:`1px solid ${t.border}`, borderRadius:8, fontSize:11 }}
+            labelStyle={{ color: t.subtext, fontSize:10 }}
+            cursor={{ fill: t.muted + '30' }}
+          />
+          <Legend
+            wrapperStyle={{ fontSize:10, paddingTop:8 }}
+            formatter={(val) => <span style={{ color: t.subtext }}>{val}</span>}
+          />
+          {owners.map(owner => (
+            <Bar
+              key={owner}
+              dataKey={owner}
+              fill={OWNER_CHART_COLORS[owner] || '#6b7280'}
+              radius={[3, 3, 0, 0]}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 // ── SUMMARY VIEW ──────────────────────────────────────────────
 const OWNER_COLORS_SUMMARY = {
@@ -233,6 +309,11 @@ function SummaryView({ summary, loading, err, balances, balLoading, balErr, onRe
           ↻ Refresh
         </button>
       </div>
+
+      {/* Net chart */}
+      {summary && (
+        <NetChart owners={summary.owners} data={summary.summary} t={t} />
+      )}
 
       {/* Saldo terkini per owner */}
       {balLoading && <div style={{ color: t.subtext, fontSize:12, textAlign:'center' }}>Loading balances...</div>}
