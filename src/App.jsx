@@ -445,6 +445,14 @@ export default function App() {
   const [dorCtx, setDorCtx]           = useState('');       // form: Office/Personal
   const [dorSubmitted, setDorSubmitted] = useState(false);
 
+  const [recurringTxs, setRecurringTxs]   = useState([]);
+  const [recurringLoading, setRecurringLoading] = useState(false);
+  const [recurringErr, setRecurringErr]   = useState(null);
+  const [recurringMonth, setRecurringMonth] = useState(() => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+});
+
   // Form state
   const [step, setStep]         = useState(0);
   const [type, setType]         = useState('');
@@ -482,6 +490,7 @@ export default function App() {
     if (tab === 'history') refreshHistory();
     if (tab === 'summary') { loadSummary(); loadBalances(); }
     if (tab === 'dor')     loadDOR();
+    if (tab === 'recurring')  loadRecurring();
   }, [tab]);
 
   const loadBalances = async (forceRefresh = false) => {
@@ -516,6 +525,18 @@ export default function App() {
     }
     setDorLoading(false);
   };
+
+  const loadRecurring = async () => {
+  setRecurringLoading(true); setRecurringErr(null);
+  try {
+    const data = await fetchTransactions(200);
+    setRecurringTxs(data);
+  } catch (err) {
+    setRecurringErr(err.message);
+  }
+  setRecurringLoading(false);
+};
+
 
   const accounts   = config?.accounts || [];
   const categories = config?.categories || [];
@@ -684,7 +705,7 @@ const handleSubmit = async () => {
 
       {/* Tabs */}
       <div style={s.tabs}>
-        {[['input','💸 Record'],['history','📋 History'],['summary','📊 Summary'],['dor','🤝 DOR']].map(([tb, label]) => (
+        {[['input','💸 Record'],['history','📋 History'],['summary','📊 Summary'],['dor','🤝 DOR'],['recurring','🔁 Bills']].map(([tb, label]) => (
           <button key={tb} onClick={() => setTab(tb)} style={{
             ...s.tabBtn,
             color: tab === tb ? t.accent : t.subtext,
@@ -1017,6 +1038,154 @@ const handleSubmit = async () => {
           )}
         </div>
       )}
+
+      {/* ── RECURRING ────────────────────────────────── */}
+{tab === 'recurring' && (
+  <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+    {/* Month selector */}
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background: t.surface, borderRadius:12, border:`1px solid ${t.border}`, padding:'10px 14px' }}>
+      <button onClick={() => {
+        const [y, m] = recurringMonth.split('-').map(Number);
+        const d = new Date(y, m - 2, 1);
+        setRecurringMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`);
+      }} style={{ background:'none', border:'none', color: t.accent, fontSize:18, cursor:'pointer', padding:'0 8px' }}>‹</button>
+      <span style={{ fontSize:13, fontWeight:700, color: t.text }}>
+        {new Date(recurringMonth + '-01').toLocaleDateString('id-ID', { month:'long', year:'numeric' })}
+      </span>
+      <button onClick={() => {
+        const [y, m] = recurringMonth.split('-').map(Number);
+        const d = new Date(y, m, 1);
+        setRecurringMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`);
+      }} style={{ background:'none', border:'none', color: t.accent, fontSize:18, cursor:'pointer', padding:'0 8px' }}>›</button>
+    </div>
+
+    {recurringLoading && <div style={{ color: t.subtext, fontSize:12, textAlign:'center' }}>Loading...</div>}
+    {recurringErr && <div style={{ color:'#f87171', fontSize:12 }}>Error: {recurringErr}</div>}
+
+    {(() => {
+      if (!recurringTxs.length) return null;
+
+      const [selYear, selMonth] = recurringMonth.split('-').map(Number);
+
+      // Helper: apakah transaksi ini expected di bulan yang dipilih?
+      const isExpectedThisMonth = (tx) => {
+        const txDate = new Date(tx.date);
+        const txMonth = txDate.getMonth() + 1;
+        if (tx.rep === 'Monthly' || tx.rep === 'Weekly') return true;
+        if (tx.rep === 'Quarterly') {
+          // expected kalau selisih bulan dari txMonth habis dibagi 3
+          const diff = (selMonth - txMonth + 12) % 12;
+          return diff % 3 === 0;
+        }
+        if (tx.rep === 'Yearly') return txMonth === selMonth;
+        return false;
+      };
+
+      // Kumpulkan unique recurring items (dedup by category+owner+rep+type)
+      const seen = new Set();
+      const recurring = recurringTxs.filter(tx => {
+        if (tx.rep === 'One Time') return false;
+        if (!isExpectedThisMonth(tx)) return false;
+        const key = `${tx.category}_${tx.owner}_${tx.rep}_${tx.type}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      if (!recurring.length) return (
+        <div style={{ color: t.subtext, fontSize:13, textAlign:'center', paddingTop:20 }}>
+          Tidak ada tagihan recurring bulan ini
+        </div>
+      );
+
+      // Cek mana yang sudah ada di bulan ini
+      const paidKeys = new Set(
+        recurringTxs
+          .filter(tx => {
+            const d = new Date(tx.date);
+            return (d.getFullYear() === selYear && d.getMonth() + 1 === selMonth && tx.rep !== 'One Time');
+          })
+          .map(tx => `${tx.category}_${tx.owner}_${tx.rep}_${tx.type}`)
+      );
+
+      // Group by owner
+      const byOwner = {};
+      for (const tx of recurring) {
+        if (!byOwner[tx.owner]) byOwner[tx.owner] = [];
+        byOwner[tx.owner].push(tx);
+      }
+
+      const totalCount = recurring.length;
+      const paidCount  = recurring.filter(tx => paidKeys.has(`${tx.category}_${tx.owner}_${tx.rep}_${tx.type}`)).length;
+
+      return (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {/* Progress */}
+          <div style={{ background: t.surface, borderRadius:12, border:`1px solid ${t.border}`, padding:'12px 16px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+              <span style={{ fontSize:12, color: t.subtext }}>Checked off</span>
+              <span style={{ fontSize:12, fontWeight:700, color: t.text }}>{paidCount} / {totalCount}</span>
+            </div>
+            <div style={{ height:6, background: t.border, borderRadius:3 }}>
+              <div style={{ height:6, borderRadius:3, background: t.accent, width:`${totalCount > 0 ? (paidCount/totalCount)*100 : 0}%`, transition:'width 0.4s' }} />
+            </div>
+          </div>
+
+          {/* Per owner */}
+          {Object.entries(byOwner).map(([owner, items]) => {
+            const color = OWNER_COLORS[owner] || '#6b7280';
+            return (
+              <div key={owner} style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, overflow:'hidden' }}>
+                <div style={{ padding:'10px 16px', background: t.card, display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background: color }} />
+                  <span style={{ fontSize:12, fontWeight:700, color: t.text }}>{owner}</span>
+                </div>
+                {items.map((tx, i) => {
+                  const key   = `${tx.category}_${tx.owner}_${tx.rep}_${tx.type}`;
+                  const isPaid = paidKeys.has(key);
+                  const typeColor = { Expense:'#f87171', Income:'#4ade80', Transfer:'#60a5fa' };
+                  return (
+                    <div key={i} style={{
+                      display:'flex', alignItems:'center', gap:12,
+                      padding:'10px 16px', borderTop:`1px solid ${t.border}`,
+                      opacity: isPaid ? 0.5 : 1,
+                    }}>
+                      {/* Checkbox visual — read only, driven by data */}
+                      <div style={{
+                        width:18, height:18, borderRadius:5, flexShrink:0,
+                        background: isPaid ? t.accent : 'none',
+                        border: `2px solid ${isPaid ? t.accent : t.muted}`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>
+                        {isPaid && <span style={{ fontSize:11, color: '#13141f', fontWeight:700 }}>✓</span>}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:600, color: isPaid ? t.subtext : t.text, textDecoration: isPaid ? 'line-through' : 'none' }}>
+                          {tx.category}
+                        </div>
+                        <div style={{ fontSize:11, color: t.subtext }}>
+                          {tx.rep} · {tx.from || tx.to || ''}
+                        </div>
+                      </div>
+                      <div style={{ textAlign:'right', flexShrink:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color: typeColor[tx.type] || t.subtext, fontFamily:'DM Mono, monospace' }}>
+                          {idr(tx.amount)}
+                        </div>
+                        {isPaid && <div style={{ fontSize:10, color: t.accent }}>✓ recorded</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      );
+    })()}
+
+  </div>
+)}
     </div>
   );
 }
