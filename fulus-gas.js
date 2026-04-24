@@ -2,23 +2,23 @@
 // FULUS BACKEND v3
 // Google Apps Script — paste ke Extensions > Apps Script
 //
-// PERUBAHAN DARI v2:
-// - Daftar akun & kategori dibaca dari sheet, bukan hardcoded
-// - doGet  → PWA bisa fetch accounts, categories, transactions
-// - doPost → PWA bisa kirim transaksi baru
-// - generateSummary & onEdit tetap ada, tidak berubah
+// CHANGES FROM v2:
+// - Account & category lists read from sheets, not hardcoded
+// - doGet → PWA can fetch accounts, categories, transactions
+// - doPost → PWA can send new transactions
+// - generateSummary & onEdit remain unchanged
 //
-// SETUP AWAL (sekali saja):
-// 1. Jalankan setupSheets() → akan bikin sheet Accounts & Categories
-// 2. Isi data di kedua sheet itu (contoh sudah disediakan)
-// 3. Deploy sebagai Web App:
+// INITIAL SETUP (run once only):
+// 1. Run setupSheets() → will create Accounts & Categories sheets
+// 2. Fill in data in both sheets (examples are already provided)
+// 3. Deploy as Web App:
 //    Deploy > New Deployment > Web App
 //    Execute as: Me | Who has access: Anyone
-//    Copy URL-nya → pasang di PWA sebagai GAS_URL
+//    Copy the URL → paste in PWA as GAS_URL
 // ============================================================
 
 // ============================================================
-// KONSTANTA
+// CONSTANTS
 // ============================================================
 const SOURCE_SHEET   = "Transactions";
 const SUMMARY_SHEET  = "📊 Monthly Summary";
@@ -29,12 +29,13 @@ const COL = { ID:1, AMOUNT:2, DATE:3, REP:4, FROM:5, TO:6, OWNER:7, TYPE:8, CATE
 
 // Secret key untuk autentikasi PWA — ganti dengan string random panjang
 // Generate di: https://randomkeygen.com (pakai "Fort Knox Passwords")
-const SECRET_KEY = "GANTI_DENGAN_STRING_RANDOM_PANJANG_MINIMAL_32_KARAKTER";
+const SECRET_KEY = "CHANGE_WITH_YOUR_KEY_MIN_32_CHARACTERS";
 
 const BRIDGE_ACCOUNTS = ["A-S Balance", "A-E Balance", "A-H Balance"];
+const DOR_SHEET = "Debts / Reimbursements";
 
 // ============================================================
-// SETUP — jalankan SEKALI untuk bikin sheet lookup
+// SETUP — RUN ONCE to create lookup sheets
 // ============================================================
 function setupSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -47,27 +48,12 @@ function setupSheets() {
     accSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#e8eaf6");
 
     const defaultAccounts = [
-      ["Aksel",              "Personal",  true],
       ["BRI",                "Personal",  true],
       ["BSI",                "Personal",  true],
       ["Dana",               "Personal",  true],
       ["Flip",               "Personal",  true],
-      ["Jago",               "Personal",  true],
-      ["Shopee",             "Personal",  true],
-      ["SPayLater",          "Personal",  true],
-      ["Bibit",              "Investment",true],
-      ["Google Play Credit", "Personal",  true],
       ["House Bank",         "House",     true],
       ["House Cash",         "House",     true],
-      ["XL 330",             "House",     true],
-      ["XL 541",             "House",     true],
-      ["Servo Bank",         "Servo",     true],
-      ["Servo Cash",         "Servo",     true],
-      ["Servo Hutang",       "Servo",     true],
-      ["Servo Pinjam",       "Servo",     true],
-      ["ElFamilia",          "ElFamilia", true],
-      ["A-S Balance",        "Unown",     true],
-      ["A-E Balance",        "Unown",     true],
       ["A-H Balance",        "Unown",     true],
     ];
     accSheet.getRange(2, 1, defaultAccounts.length, 3).setValues(defaultAccounts);
@@ -108,11 +94,11 @@ function setupSheets() {
     catSheet.setColumnWidth(2, 120);
   }
 
-  Logger.log("✅ setupSheets selesai. Cek sheet Accounts dan Categories.");
+  Logger.log("✅ setupSheets completed. Check Accounts and Categories sheets.");
 }
 
 // ============================================================
-// LOOKUP HELPERS — baca dari sheet, bukan hardcoded
+// LOOKUP HELPERS — read from sheets, not hardcoded
 // ============================================================
 function getAccounts() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ACCOUNTS_SHEET);
@@ -192,14 +178,14 @@ function doGet(e) {
 
     } else if (action === "insert") {
       const dataRaw = e && e.parameter && e.parameter.data ? e.parameter.data : null;
-      if (!dataRaw) throw new Error("data wajib diisi");
+      if (!dataRaw) throw new Error("data is required");
       const tx = JSON.parse(dataRaw);
       const id = insertTransaction(tx);
       result = { ok: true, id };
 
     } else if (action === "balances") {
       const src = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_SHEET);
-      if (!src) throw new Error("Sheet Transactions tidak ditemukan");
+      if (!src) throw new Error("Sheet Transactions not found");
       const raw  = src.getDataRange().getValues();
       const rows = raw.slice(1).filter(r => String(r[0]).trim() !== "");
       const txs  = parseRows(rows);
@@ -238,7 +224,7 @@ function doGet(e) {
 
     } else if (action === "summary") {
       const src = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SOURCE_SHEET);
-      if (!src) throw new Error("Sheet Transactions tidak ditemukan");
+      if (!src) throw new Error("Sheet Transactions not found");
       const raw  = src.getDataRange().getValues();
       const rows = raw.slice(1).filter(r => String(r[0]).trim() !== "");
       const txs  = parseRows(rows);
@@ -276,9 +262,19 @@ function doGet(e) {
       }
 
       result = { ok: true, data: { owners, summary: summaryData, bridges } };
+    
+    } else if (action === "dor") {
+      result = { ok: true, data: getDorEntries() };
 
+    } else if (action === "insertDor") {
+      const dataRaw = e && e.parameter && e.parameter.data ? e.parameter.data : null;
+      if (!dataRaw) throw new Error("data wajib diisi");
+      const entry = JSON.parse(dataRaw);
+      const id = insertDor(entry);
+      result = { ok: true, id };
+      
     } else {
-      result = { ok: true, message: "Fulus GAS v3 is alive" };
+      result = { ok: true, message: "Fulus GAS v10 is alive" };
     }
   } catch (err) {
     result = { ok: false, error: err.toString() };
@@ -321,15 +317,15 @@ function doPost(e) {
 function insertTransaction(data) {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SOURCE_SHEET);
-  if (!sheet) throw new Error(`Sheet "${SOURCE_SHEET}" tidak ditemukan`);
+  if (!sheet) throw new Error(`Sheet "${SOURCE_SHEET}" not found`);
 
   // Validasi per type
-  if (!data.type)     throw new Error("type wajib diisi");
-  if (!data.category) throw new Error("category wajib diisi");
-  if (!data.amount)   throw new Error("amount wajib diisi");
-  if (data.type === "Income"   && !data.to)                 throw new Error("to wajib diisi untuk Income");
-  if (data.type === "Expense"  && !data.from)               throw new Error("from wajib diisi untuk Expense");
-  if (data.type === "Transfer" && (!data.from || !data.to)) throw new Error("from dan to wajib diisi untuk Transfer");
+  if (!data.type)     throw new Error("type is required");
+  if (!data.category) throw new Error("category is required");
+  if (!data.amount)   throw new Error("amount is required");
+  if (data.type === "Income"   && !data.to)                 throw new Error("to is required for Income");
+  if (data.type === "Expense"  && !data.from)               throw new Error("from is required for Expense");
+  if (data.type === "Transfer" && (!data.from || !data.to)) throw new Error("from and to are required for Transfer");
 
   // Generate ID
   const now = new Date();
@@ -448,7 +444,7 @@ function generateSummary() {
   const ss  = SpreadsheetApp.getActiveSpreadsheet();
   const src = ss.getSheetByName(SOURCE_SHEET);
   if (!src) {
-    Logger.log(`Sheet "${SOURCE_SHEET}" tidak ditemukan.`); return;
+    Logger.log(`Sheet "${SOURCE_SHEET}" not found.`); return;
     return;
   }
 
@@ -470,7 +466,7 @@ function generateSummary() {
   out.setColumnWidth(6, 120);
   out.setFrozenRows(2);
 
-  Logger.log("✅ Summary berhasil digenerate!");
+  Logger.log("✅ Summary generated successfully!");
 }
 
 function parseRows(rows) {
@@ -549,6 +545,41 @@ function getBridgeBalance(txs, bridgeAccount) {
   return net;
 }
 
+function getDorEntries() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DOR_SHEET);
+  if (!sheet) return [];
+  const rows = sheet.getDataRange().getValues().slice(1);
+  return rows
+    .filter(r => String(r[0]).trim() !== "")
+    .map(r => ({
+      id:      String(r[0]),
+      date:    r[1] instanceof Date ? r[1].toISOString() : String(r[1]),
+      person:  String(r[2] || "").trim(),
+      amount:  parseInt(String(r[3]).replace(/[^0-9-]/g, "")) || 0,  // signed
+      context: String(r[4] || "").trim(),
+    }))
+    .reverse();  // newest first
+}
+
+function insertDor(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DOR_SHEET);
+  if (!sheet) throw new Error(`Sheet "${DOR_SHEET}" not found`);
+
+  if (!data.person)  throw new Error("person is required");
+  if (!data.amount)  throw new Error("amount is required");
+  if (!data.context) throw new Error("context is required");
+
+  const now = new Date();
+  const id  = generateId(now);
+  // direction: "in" = receivable (+), "out" = payable (-)
+  const signed = data.direction === "out"
+    ? -Math.abs(parseInt(data.amount) || 0)
+    :  Math.abs(parseInt(data.amount) || 0);
+
+  sheet.appendRow([id, now, data.person.trim(), signed, data.context.trim()]);
+  return id;
+}
+
 function getAnomalies(txs) {
   const issues = [];
   const followUps  = txs.filter(t => t.type === "Follow-Up");
@@ -558,21 +589,21 @@ function getAnomalies(txs) {
       t.amount === fu.amount && t.date.toDateString() === fu.date.toDateString() && t.id !== fu.id
     );
     if (!partner) {
-      issues.push({ level:"⚠️", msg:`Follow-Up tanpa pasangan: ${fu.id} | ${fu.category} | ${idr(fu.amount)}` });
+      issues.push({ level:"⚠️", msg:`Follow-Up without partner: ${fu.id} | ${fu.category} | ${idr(fu.amount)}` });
     }
   }
   const bridgeAccounts = BRIDGE_ACCOUNTS;
   for (const bridge of bridgeAccounts) {
     const bal = getBridgeBalance(txs, bridge);
     if (Math.abs(bal) > 0) {
-      issues.push({ level:"🔵", msg:`${bridge} net ${idr(bal)} — ada selisih yang belum settled` });
+      issues.push({ level:"🔵", msg:`${bridge} net ${idr(bal)} — difference not yet settled` });
     }
   }
   const seen = {};
   for (const t of txs) {
     const key = `${t.amount}_${t.date.toDateString()}_${t.category}_${t.owner}_${t.type}`;
     if (seen[key]) {
-      issues.push({ level:"❓", msg:`Kemungkinan duplikat: ${t.id} & ${seen[key]} | ${t.category} | ${idr(t.amount)}` });
+      issues.push({ level:"❓", msg:`Possible duplicate: ${t.id} & ${seen[key]} | ${t.category} | ${idr(t.amount)}` });
     } else {
       seen[key] = t.id;
     }
@@ -629,7 +660,7 @@ class SheetWriter {
 
 function writeFull(w, txs) {
   const now    = new Date();
-  // Owner dibaca dinamis dari sheet Accounts — tidak hardcoded
+  // Owner is read dynamically from Accounts sheet — not hardcoded
   const allAccounts = getAccounts();
   const owners = [...new Set(allAccounts.map(a => a.owner))].filter(o => o !== "Unown");
 
@@ -715,17 +746,17 @@ function writeFull(w, txs) {
   w.blank();
 
   const anomalies = getAnomalies(txs);
-  w.section("🔍  DETEKSI ANOMALI");
+  w.section("🔍  ANOMALIES DETECTED");
   if (anomalies.length === 0) {
-    w.note("✅ Tidak ada anomali terdeteksi.", "#e8f5e9");
+    w.note("✅ No anomalies detected.", "#e8f5e9");
   } else {
-    w.note(`${anomalies.length} potensi anomali ditemukan:`, "#fff3e0");
+    w.note(`${anomalies.length} potential anomalies detected:`, "#fff3e0");
     for (const a of anomalies) w.note(`${a.level}  ${a.msg}`, "#fff9c4");
   }
   w.blank();
 
-  w.section("📅  ESTIMASI BIAYA BULANAN GABUNGAN");
-  w.write(["Owner","Est. Biaya/Bulan","Est. Biaya/Tahun","","",""], { bold:true, bg:"#eceff1" });
+  w.section("📅  ESTIMATED MONTHLY EXPENSES");
+  w.write(["Owner","Est. Expense/Month","Est. Expense/Year","","",""], { bold:true, bg:"#eceff1" });
   let grandTotal = 0;
   for (const owner of owners) {
     const s = getOwnerStats(txs, owner);

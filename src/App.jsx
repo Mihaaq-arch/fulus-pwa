@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchConfig, fetchSummary, fetchBalances } from './gas.js';
+import { fetchConfig, fetchSummary, fetchBalances, fetchDOR, postDOR, fetchTransactions } from './gas.js';
 import { enqueue, syncQueue, getPendingCount, getAll, clearSynced } from './db.js';
 
 // ── VERSION ───────────────────────────────────────────────────
@@ -436,6 +436,15 @@ export default function App() {
   const [balLoading, setBalLoading] = useState(false);
   const [balErr, setBalErr]         = useState(null);
 
+  const [dorEntries, setDorEntries]   = useState([]);
+  const [dorLoading, setDorLoading]   = useState(false);
+  const [dorErr, setDorErr]           = useState(null);
+  const [dorPerson2, setDorPerson2]   = useState('');       // form: name
+  const [dorAmount2, setDorAmount2]   = useState('0');      // form: amount
+  const [dorDir, setDorDir]           = useState('in');     // form: in/out
+  const [dorCtx, setDorCtx]           = useState('');       // form: Office/Personal
+  const [dorSubmitted, setDorSubmitted] = useState(false);
+
   // Form state
   const [step, setStep]         = useState(0);
   const [type, setType]         = useState('');
@@ -472,6 +481,7 @@ export default function App() {
   useEffect(() => {
     if (tab === 'history') refreshHistory();
     if (tab === 'summary') { loadSummary(); loadBalances(); }
+    if (tab === 'dor')     loadDOR();
   }, [tab]);
 
   const loadBalances = async (forceRefresh = false) => {
@@ -494,6 +504,17 @@ export default function App() {
       setSummaryErr(err.message);
     }
     setSummaryLoading(false);
+  };
+
+  const loadDOR = async () => {
+    setDorLoading(true); setDorErr(null);
+    try {
+      const data = await fetchDOR();
+      setDorEntries(data);
+    } catch (err) {
+      setDorErr(err.message);
+    }
+    setDorLoading(false);
   };
 
   const accounts   = config?.accounts || [];
@@ -663,7 +684,7 @@ const handleSubmit = async () => {
 
       {/* Tabs */}
       <div style={s.tabs}>
-        {[['input','💸 Record'],['history','📋 History'],['summary','📊 Summary']].map(([tb, label]) => (
+        {[['input','💸 Record'],['history','📋 History'],['summary','📊 Summary'],['dor','🤝 DOR']].map(([tb, label]) => (
           <button key={tb} onClick={() => setTab(tb)} style={{
             ...s.tabBtn,
             color: tab === tb ? t.accent : t.subtext,
@@ -865,6 +886,137 @@ const handleSubmit = async () => {
         )}
 
       </div>
+      {/* ── DOR ──────────────────────────────────────── */}
+      {tab === 'dor' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+          {/* Form input */}
+          {!dorSubmitted ? (
+            <div style={{ background: t.surface, borderRadius:14, border:`1px solid ${t.border}`, padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>New Entry</div>
+
+              {/* Person */}
+              <input
+                value={dorPerson2}
+                onChange={e => setDorPerson2(e.target.value)}
+                placeholder="Person name..."
+                style={s.input}
+              />
+
+              {/* Direction */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {[
+                  { key:'in',  label:'They owe me', color:'#4ade80' },
+                  { key:'out', label:'I owe them',  color:'#f87171' },
+                ].map(({ key, label, color }) => (
+                  <button key={key} onClick={() => setDorDir(key)} style={{
+                    background: dorDir === key ? color + '20' : t.card,
+                    border: `1.5px solid ${dorDir === key ? color : t.border}`,
+                    color: dorDir === key ? color : t.subtext,
+                    borderRadius:10, padding:'12px 8px', fontSize:13, fontWeight:600, cursor:'pointer'
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {/* Amount */}
+              <NumPad value={dorAmount2} onChange={setDorAmount2} t={t} />
+
+              {/* Context */}
+              <ChipGrid
+                items={['Office', 'Personal']}
+                selected={dorCtx}
+                onSelect={setDorCtx}
+                getColor={() => t.accent}
+                columns={2} t={t}
+              />
+
+              <button
+                disabled={!dorPerson2 || !dorCtx || !dorAmount2 || dorAmount2 === '0'}
+                onClick={async () => {
+                  await postDOR({ person: dorPerson2, amount: dorAmount2, direction: dorDir, context: dorCtx });
+                  setDorEntries(prev => [{
+                    id: 'pending',
+                    date: new Date().toISOString(),
+                    person: dorPerson2,
+                    amount: dorDir === 'out' ? -parseInt(dorAmount2) : parseInt(dorAmount2),
+                    context: dorCtx,
+                  }, ...prev]);
+                  setDorPerson2(''); setDorAmount2('0'); setDorDir('in'); setDorCtx('');
+                  setDorSubmitted(true);
+                }}
+                style={{ ...s.primaryBtn, background: t.accent, color: isDark ? '#13141f' : '#fff',
+                  opacity: (!dorPerson2 || !dorCtx || !dorAmount2 || dorAmount2 === '0') ? 0.4 : 1
+                }}
+              >✓ Save</button>
+            </div>
+          ) : (
+            <div style={{ textAlign:'center', padding:'24px 0' }}>
+              <div style={{ fontSize:40 }}>✓</div>
+              <div style={{ color: t.accent, fontWeight:700, marginTop:8 }}>Saved!</div>
+              <button onClick={() => setDorSubmitted(false)} style={{ ...s.primaryBtn, width:160, marginTop:16 }}>+ Add Another</button>
+            </div>
+          )}
+
+          {/* Net per person */}
+          {(() => {
+            const nets = {};
+            for (const e of dorEntries) {
+              if (!nets[e.person]) nets[e.person] = { Office:0, Personal:0 };
+              nets[e.person][e.context] = (nets[e.person][e.context] || 0) + e.amount;
+            }
+            const people = Object.entries(nets);
+            if (people.length === 0) return null;
+            return (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>Net per Person</div>
+                {people.map(([person, ctx]) => {
+                  const total = (ctx.Office || 0) + (ctx.Personal || 0);
+                  const color = total > 0 ? '#4ade80' : total < 0 ? '#f87171' : t.subtext;
+                  return (
+                    <div key={person} style={{ background: t.surface, borderRadius:12, border:`1px solid ${t.border}`, padding:'12px 16px' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span style={{ fontSize:14, fontWeight:700, color: t.text }}>{person}</span>
+                        <span style={{ fontSize:15, fontWeight:700, color, fontFamily:'DM Mono, monospace' }}>
+                          {total > 0 ? '+' : ''}{idr(total)}
+                        </span>
+                      </div>
+                      {(ctx.Office !== 0 || ctx.Personal !== 0) && (
+                        <div style={{ display:'flex', gap:12, marginTop:6 }}>
+                          {ctx.Office !== 0 && <span style={{ fontSize:11, color: t.subtext }}>Office: {idr(ctx.Office)}</span>}
+                          {ctx.Personal !== 0 && <span style={{ fontSize:11, color: t.subtext }}>Personal: {idr(ctx.Personal)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Entry list */}
+          {dorLoading && <div style={{ color: t.subtext, fontSize:12, textAlign:'center' }}>Loading...</div>}
+          {dorErr && <div style={{ color:'#f87171', fontSize:12 }}>Error: {dorErr}</div>}
+          {dorEntries.length > 0 && (
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ fontSize:11, color: t.subtext, fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>History</div>
+              {dorEntries.map((e, i) => {
+                const color = e.amount >= 0 ? '#4ade80' : '#f87171';
+                return (
+                  <div key={i} style={{ background: t.surface, borderRadius:12, border:`1px solid ${t.border}`, padding:'10px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', borderLeftWidth:3, borderLeftColor: color }}>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:600, color: t.text }}>{e.person}</div>
+                      <div style={{ fontSize:11, color: t.subtext }}>{e.context} · {new Date(e.date).toLocaleDateString('id-ID')}</div>
+                    </div>
+                    <span style={{ fontSize:14, fontWeight:700, color, fontFamily:'DM Mono, monospace' }}>
+                      {e.amount >= 0 ? '+' : ''}{idr(e.amount)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

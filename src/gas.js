@@ -81,3 +81,28 @@ export async function fetchBalances(forceRefresh = false) {
   localStorage.setItem(CACHE_KEY, JSON.stringify({ data: json.data, ts: Date.now() }));
   return json.data;
 }
+// Fetch DOR entries — no cache, always fresh (tiny data)
+export async function fetchDOR() {
+  const res  = await fetch(`${GAS_URL}?action=dor&key=${GAS_KEY}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "GAS error");
+  return json.data;
+}
+
+// Insert DOR entry via no-cors
+export async function postDOR(entry) {
+  const payload = encodeURIComponent(JSON.stringify(entry));
+  await fetch(
+    `${GAS_URL}?action=insertDor&key=${GAS_KEY}&data=${payload}`,
+    { method: 'GET', mode: 'no-cors' }
+  );
+  return 'sent';
+}
+
+// Fetch recent transactions — no cache, used for recurring checklist
+export async function fetchTransactions(limit = 200) {
+  const res  = await fetch(`${GAS_URL}?action=transactions&limit=${limit}&key=${GAS_KEY}`);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || "GAS error");
+  return json.data;
+}
