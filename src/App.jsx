@@ -29,8 +29,9 @@ export default function App() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(
-    () => !!localStorage.getItem('fulus_gas_url')
+    () => !!localStorage.getItem('fulus_spreadsheet_id')
   );
+  const isGasReady = !!localStorage.getItem('fulus_url');
   const [configErr, setConfigErr] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -77,7 +78,7 @@ export default function App() {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    if (!isConfigured) { setLoading(false); return; }
+    if (!isConfigured || !isGasReady) { setLoading(false); return; }
     fetchConfig()
       .then(data => { setConfig(data); setLoading(false); })
       .catch(err => { setConfigErr(err.message); setLoading(false); });
@@ -96,9 +97,12 @@ export default function App() {
 
   useEffect(() => {
     if (tab === 'history') refreshHistory();
-    if (tab === 'summary') { loadSummary(); loadBalances(); }
-    if (tab === 'dor') loadDOR();
-    if (tab === 'recurring') loadRecurring();
+    if (tab === 'summary') {
+      if (!isGasReady) { setSummaryErr(null); setBalErr(null); return; }
+      loadSummary(); loadBalances();
+    }
+    if (tab === 'dor' && isGasReady) loadDOR();
+    if (tab === 'recurring' && isGasReady) loadRecurring();
   }, [tab]);
 
   const loadBalances = async (forceRefresh = false) => {
@@ -282,7 +286,7 @@ export default function App() {
     <OnboardingScreen t={t} onComplete={() => setIsConfigured(true)} />
   );
 
-  if (configErr) return (
+  if (configErr && isGasReady) return (
     <div style={{ ...s.screen, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
       <div style={{ color: '#f87171', fontSize: 13, textAlign: 'center' }}>
         Failed to load config<br /><span style={{ color: t.subtext, fontSize: 11 }}>{configErr}</span>

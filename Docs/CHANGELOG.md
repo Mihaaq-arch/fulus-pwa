@@ -3,10 +3,22 @@
 > Append-only. Tambah entri baru di ATAS. Jangan edit entri lama.
 > Format: `## [YYYY-MM-DD] Judul singkat`
 
+## [M1-S1] — [2026-06-06] Auto-create Spreadsheet di Drive user selesai.
+### Added
+- Drive API dipanggil setelah token didapat, spreadsheet "Fulus Data" berhasil dibuat
+- Spreadsheet ID tersimpan di localStorage (fulus_spreadsheet_id)
+- OnboardingScreen refactor: step internal login → creating → error, auto-skip login kalau token masih valid
+- gas.js refactor: hapus static import config.local.js, semua fungsi baca url+key dari localStorage via getGasConfig()
+- App.jsx: isConfigured sekarang cek fulus_spreadsheet_id, isGasReady cek fulus_gas_url
+- Guard isGasReady ditambah di fetchConfig, tab summary, dor, recurring — tidak ada fetch kalau GAS belum configured
+- Error "GAS not configured" disuppress dari UI selama isGasReady false
+
+**Commit:** feat(fulus): M1-S2 auto-create spreadsheet + refactor gas.js & onboarding flow
+
 ---
 ## [M1-S1] — [2026-06-06]
 ### Added
-- OnboardingScreen komponen baru — muncul kalau belum ada `fulus_gas_url` di localStorage
+- OnboardingScreen komponen baru — muncul kalau belum ada `fulus_url` di localStorage
 - OAuth login via Google Identity Services (token client, bukan sign-in button)
 - Access token + expiry disimpan ke localStorage setelah login berhasil
 - fetchConfig() di App.jsx skip kalau belum configured

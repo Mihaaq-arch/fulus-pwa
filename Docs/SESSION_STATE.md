@@ -73,7 +73,7 @@ src/
 
 Config (gitignored, tidak di repo):
 ```
-config.local.js           → GAS_URL + GAS_KEY per user
+config.local.js           → url + key per user
 ```
 
 ---
@@ -155,7 +155,7 @@ Data: tiap user punya GSheet sendiri di Drive mereka — bukan di server kita
 | Sesi | Scope | Done criteria |
 |---|---|---|
 | M1-S1 | OAuth login Google (Google Identity Services) | Token berhasil didapat dan tersimpan di localStorage | DONE
-| M1-S2 | Auto-create Spreadsheet di Drive user via Drive API | Sheet baru muncul di Drive user, Spreadsheet ID tersimpan |
+| M1-S2 | Auto-create Spreadsheet di Drive user via Drive API | Sheet baru muncul di Drive user, Spreadsheet ID tersimpan | DONE
 | M1-S3 | Inject `fulus-gas.js` + deploy sebagai Web App via Apps Script API | Deployment URL bisa di-ping, balik response ok |
 | M1-S4 | Generate SECRET_KEY random → patch ke script → simpan URL+key, hapus `config.local.js` | Fulus jalan penuh tanpa `config.local.js` |
 | M1-S5 | Onboarding UI — progress indicator, error handling, retry | User experience mulus dari buka app sampai siap pakai |
@@ -201,7 +201,12 @@ Dependency: Milestone 1 harus selesai dulu
 [kosongkan — tunggu sesi berikutnya]
 
 ### Sesi sebelumnya
-[M1-S1 — Juni 2026] OAuth login Google selesai. Token berhasil didapat via GIS token client,
-disimpan ke localStorage. Drive API test passed. OnboardingScreen.jsx dibuat.
-App.jsx skip fetchConfig kalau belum configured.
+[M1-S2 — Juni 2026] Auto-create Spreadsheet di Drive user selesai.
+- Drive API dipanggil setelah token didapat, spreadsheet "Fulus Data" berhasil dibuat
+- Spreadsheet ID tersimpan di localStorage (fulus_spreadsheet_id)
+- OnboardingScreen refactor: step internal login → creating → error, auto-skip login kalau token masih valid
+- gas.js refactor: hapus static import config.local.js, semua fungsi baca url+key dari localStorage via getGasConfig()
+- App.jsx: isConfigured sekarang cek fulus_spreadsheet_id, isGasReady cek fulus_gas_url
+- Guard isGasReady ditambah di fetchConfig, tab summary, dor, recurring — tidak ada fetch kalau GAS belum configured
+- Error "GAS not configured" disuppress dari UI selama isGasReady false
 Status: done

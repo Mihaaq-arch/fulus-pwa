@@ -39,8 +39,8 @@ cp config.example.js config.local.js
 Edit `config.local.js`:
 
 ```js
-export const GAS_URL = "https://script.google.com/macros/s/YOUR_ID/exec";
-export const GAS_KEY = "your-secret-key";
+export const url = "https://script.google.com/macros/s/YOUR_ID/exec";
+export const key = "your-secret-key";
 ```
 
 `config.local.js` is gitignored — safe to put real values here.

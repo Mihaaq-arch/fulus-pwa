@@ -5,5 +5,5 @@
 // config.local.js sudah di-.gitignore, aman untuk repo public
 // ============================================================
 
-export const GAS_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
-export const GAS_KEY = "YOUR_SECRET_KEY";
+export const url = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+export const key = "YOUR_SECRET_KEY";
