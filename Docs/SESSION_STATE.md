@@ -195,18 +195,26 @@ Dependency: Milestone 1 harus selesai dulu
 
 ---
 
-## Session
-
 ### Sesi ini
 [kosongkan — tunggu sesi berikutnya]
 
 ### Sesi sebelumnya
-[M1-S2 — Juni 2026] Auto-create Spreadsheet di Drive user selesai.
-- Drive API dipanggil setelah token didapat, spreadsheet "Fulus Data" berhasil dibuat
-- Spreadsheet ID tersimpan di localStorage (fulus_spreadsheet_id)
-- OnboardingScreen refactor: step internal login → creating → error, auto-skip login kalau token masih valid
-- gas.js refactor: hapus static import config.local.js, semua fungsi baca url+key dari localStorage via getGasConfig()
-- App.jsx: isConfigured sekarang cek fulus_spreadsheet_id, isGasReady cek fulus_gas_url
-- Guard isGasReady ditambah di fetchConfig, tab summary, dor, recurring — tidak ada fetch kalau GAS belum configured
-- Error "GAS not configured" disuppress dari UI selama isGasReady false
-Status: done
+[M1-S3+S4+S5 — Juni 2026] Onboarding otomatis selesai (perlu konfirmasi production).
+
+**Selesai:**
+- fulus-gas.js dipindah ke src/ untuk Vite ?raw import
+- Inject GAS via Apps Script API (bound ke spreadsheet)
+- Generate SECRET_KEY random per user
+- Deploy Web App otomatis, URL tersimpan di localStorage + fulus-config.json di Drive
+- Returning user: load config dari Drive, skip setup
+- Onboarding UI: 6 step progress, error per-step, retry, Apps Script API disabled handler
+- setupSheets diperluas: tambah sheet Transactions + DOR
+
+**Belum confirmed (butuh test di production/GitHub Pages):**
+- initSheets (action=setup) — CORS block di localhost, belum bisa diverifikasi
+- Sheets terbuat otomatis di Spreadsheet user
+
+**Backlog baru:**
+- Version check: konstanta GAS_VERSION di fulus-gas.js + version.json di GitHub
+- Popup notifikasi kalau GAS outdated
+- "Update GAS" button — re-upload + redeploy tanpa hapus data

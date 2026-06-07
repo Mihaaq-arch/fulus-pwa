@@ -2,6 +2,22 @@
 
 > Append-only. Tambah entri baru di ATAS. Jangan edit entri lama.
 > Format: `## [YYYY-MM-DD] Judul singkat`
+## [M1-S3+S4+S5] — [2026-06-07] Onboarding otomatis via OAuth selesai
+### Added
+- fulus-gas.js dipindah ke src/ untuk Vite ?raw import
+- Apps Script API: inject + deploy GAS bound ke spreadsheet user
+- SECRET_KEY random di-generate per user (bukan hardcoded)
+- URL + key disimpan ke localStorage dan fulus-config.json di Drive user
+- Returning user: config di-load dari Drive, skip full setup
+- Onboarding UI: 6 step progress indicator, error per-step, retry
+- Handler khusus Apps Script API disabled (link ke usersettings)
+- setupSheets diperluas: Transactions + DOR sheet dibuat otomatis
+- action=setup endpoint ditambah di fulus-gas.js
+
+### Pending confirmation (test di production)
+- initSheets via action=setup — CORS block di localhost
+
+**Commit:** feat(fulus): M1-S3+S4+S5 onboarding otomatis via OAuth + Apps Script API
 
 ## [M1-S1] — [2026-06-06] Auto-create Spreadsheet di Drive user selesai.
 ### Added

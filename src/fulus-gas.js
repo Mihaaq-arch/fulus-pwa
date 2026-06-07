@@ -48,11 +48,7 @@ function setupSheets() {
     const defaultAccounts = [
       ["BRI", "Personal", true],
       ["BSI", "Personal", true],
-      ["Dana", "Personal", true],
-      ["Flip", "Personal", true],
       ["House Bank", "House", true],
-      ["House Cash", "House", true],
-      ["A-H Balance", "Unown", true],
     ];
     accSheet.getRange(2, 1, defaultAccounts.length, 3).setValues(defaultAccounts);
     accSheet.setColumnWidth(1, 200);
@@ -90,6 +86,24 @@ function setupSheets() {
     catSheet.getRange(2, 1, defaultCats.length, 3).setValues(defaultCats);
     catSheet.setColumnWidth(1, 160);
     catSheet.setColumnWidth(2, 120);
+
+    // --- Sheet: Transactions ---
+    if (!ss.getSheetByName(SOURCE_SHEET)) {
+      const txSheet = ss.insertSheet(SOURCE_SHEET);
+      txSheet.getRange(1, 1, 1, 12).setValues([[
+        "ID", "Amount", "Date", "Rep", "From", "To", "Owner", "Type", "Category", "System Sum", "Notes", "Link ID"
+      ]]);
+      txSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#e8eaf6");
+    }
+
+    // --- Sheet: Debts / Reimbursements ---
+    if (!ss.getSheetByName(DOR_SHEET)) {
+      const dorSheet = ss.insertSheet(DOR_SHEET);
+      dorSheet.getRange(1, 1, 1, 5).setValues([[
+        "ID", "Date", "Person", "Amount", "Context"
+      ]]);
+      dorSheet.getRange(1, 1, 1, 5).setFontWeight("bold").setBackground("#e8eaf6");
+    }
   }
 
   Logger.log("✅ setupSheets completed. Check Accounts and Categories sheets.");
