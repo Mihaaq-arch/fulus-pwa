@@ -154,7 +154,7 @@ Data: tiap user punya GSheet sendiri di Drive mereka — bukan di server kita
 
 | Sesi | Scope | Done criteria |
 |---|---|---|
-| M1-S1 | OAuth login Google (Google Identity Services) | Token berhasil didapat dan tersimpan di localStorage |
+| M1-S1 | OAuth login Google (Google Identity Services) | Token berhasil didapat dan tersimpan di localStorage | DONE
 | M1-S2 | Auto-create Spreadsheet di Drive user via Drive API | Sheet baru muncul di Drive user, Spreadsheet ID tersimpan |
 | M1-S3 | Inject `fulus-gas.js` + deploy sebagai Web App via Apps Script API | Deployment URL bisa di-ping, balik response ok |
 | M1-S4 | Generate SECRET_KEY random → patch ke script → simpan URL+key, hapus `config.local.js` | Fulus jalan penuh tanpa `config.local.js` |
@@ -198,21 +198,10 @@ Dependency: Milestone 1 harus selesai dulu
 ## Session
 
 ### Sesi ini
-**Masalah:**
-Milestone 1 Sesi 1 — OAuth login Google.
-User buka Fulus, belum ada config (tidak ada `GAS_URL` di localStorage) → muncul halaman onboarding → klik "Login with Google" → dapat access token via Google Identity Services.
-
-**File yang akan diubah:**
-- `src/gas.js` — tambah fungsi OAuth, simpan token
-- `src/App.jsx` — deteksi first-time user, render OnboardingScreen jika belum ada config
-- `src/components/OnboardingScreen.jsx` — komponen baru (halaman login)
-
-**Done criteria:**
-- Fulus deteksi kondisi "belum setup" (tidak ada GAS_URL di localStorage)
-- Muncul layar onboarding dengan tombol login Google
-- Klik login → Google OAuth popup → token tersimpan di localStorage
-- Token bisa dipakai untuk request ke Drive API (verifikasi dengan console.log scope)
+[kosongkan — tunggu sesi berikutnya]
 
 ### Sesi sebelumnya
-[Juni 2026] — Milestone planning + buat CHANGELOG dan SESSION STATE. Breakdown Milestone 1 jadi 5 sesi dengan scope jelas. Baca kondisi aktual App.jsx, gas.js, fulus-gas.js.
+[M1-S1 — Juni 2026] OAuth login Google selesai. Token berhasil didapat via GIS token client,
+disimpan ke localStorage. Drive API test passed. OnboardingScreen.jsx dibuat.
+App.jsx skip fetchConfig kalau belum configured.
 Status: done

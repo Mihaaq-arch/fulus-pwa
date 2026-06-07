@@ -4,6 +4,15 @@
 > Format: `## [YYYY-MM-DD] Judul singkat`
 
 ---
+## [M1-S1] — [2026-06-06]
+### Added
+- OnboardingScreen komponen baru — muncul kalau belum ada `fulus_gas_url` di localStorage
+- OAuth login via Google Identity Services (token client, bukan sign-in button)
+- Access token + expiry disimpan ke localStorage setelah login berhasil
+- fetchConfig() di App.jsx skip kalau belum configured
+- config.local.js tetap ada (kosong) sebagai placeholder sampai M1-S4
+
+**Commit:** feat(fulus): M1-S1 OAuth login via Google Identity Services
 
 ## [2026-06-06] Milestone planning — roadmap Fulus ke release publik
 
